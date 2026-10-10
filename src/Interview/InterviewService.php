@@ -31,7 +31,9 @@ final class InterviewService
         try {
             $plan = $this->validator->validatePlan($this->openAI->createPlan($candidate));
         } catch (AIUnavailableException $exception) {
-            throw new HttpException(503, 'The interview service is temporarily unavailable.');
+            throw new HttpException(503, 'The interview service is temporarily unavailable.', $exception->withStage('plan')->diagnostics);
+        } catch (HttpException $exception) {
+            throw $this->invalidOutput($exception, 'plan', 'INVALID_PLAN');
         }
 
         $id = $this->uuid();
@@ -129,9 +131,13 @@ final class InterviewService
             try {
                 $rawDecision = $this->openAI->decide($context);
             } catch (AIUnavailableException $exception) {
-                throw new HttpException(503, 'The interview service is temporarily unavailable.');
+                throw new HttpException(503, 'The interview service is temporarily unavailable.', $exception->withStage('decision')->diagnostics);
             }
-            $decision = $this->validator->validateDecision($rawDecision, $allowedActions, $latestAnswer);
+            try {
+                $decision = $this->validator->validateDecision($rawDecision, $allowedActions, $latestAnswer);
+            } catch (HttpException $exception) {
+                throw $this->invalidOutput($exception, 'decision', 'INVALID_DECISION');
+            }
 
             if ($decision['action'] === 'ask_question' || $decision['action'] === 'probe_answer') {
                 $arguments = $decision['arguments'];
@@ -149,7 +155,9 @@ final class InterviewService
                         $this->openAI->verifyClaim($context, $decision['arguments']['claim']),
                     );
                 } catch (AIUnavailableException $exception) {
-                    throw new HttpException(503, 'The interview service is temporarily unavailable.');
+                    throw new HttpException(503, 'The interview service is temporarily unavailable.', $exception->withStage('claim_verification')->diagnostics);
+                } catch (HttpException $exception) {
+                    throw $this->invalidOutput($exception, 'claim_verification', 'INVALID_EVALUATION');
                 }
                 $this->store->addDecision($id, 'verify_claim', $decision['arguments'], $decision['rationale'], $evaluation);
                 $this->store->addEvaluation($id, (int) $latestAnswer['id'], 'claim_verification', $evaluation);
@@ -208,6 +216,13 @@ final class InterviewService
         } catch (Throwable) {
             // Telemetry is best-effort and must not affect interview progress.
         }
+    }
+
+    private function invalidOutput(HttpException $exception, string $stage, string $reason): HttpException
+    {
+        return new HttpException($exception->status, $exception->getMessage(), [
+            'category' => 'invalid_output', 'stage' => $stage, 'reason' => $reason,
+        ]);
     }
 
     private function uuid(): string

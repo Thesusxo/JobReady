@@ -1,0 +1,14 @@
+{
+    "name": "jobready/interview-coach",
+    "description": "JobReady adaptive interview preparation backend",
+    "type": "project",
+    "require": {
+        "php": "^8.2",
+        "ext-fileinfo": "*",
+        "ext-dom": "*",
+        "ext-zip": "*",
+        "ext-zlib": "*",
+        "ext-iconv": "*",
+        "smalot/pdfparser": "^2.12"
+    }
+}

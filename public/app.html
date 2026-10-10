@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <meta name="description" content="Practice for your next role with an adaptive AI interview coach. Turn your experience into answers that stand out.">
+  <meta name="color-scheme" content="light">
+  <title>JobReady — Practice with purpose.</title>
+  <link rel="icon" href="assets/jobready.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="assets/app.css">
+  <script type="module" src="assets/app.mjs"></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div class="app-shell">
+    <aside class="sidebar" aria-label="Practice navigation">
+      <a class="brand" href="app.html" aria-label="JobReady home"><span class="brand-mark" aria-hidden="true">j<span>r</span></span>JobReady<span class="brand-dot" aria-hidden="true">.</span></a>
+      <div class="sidebar-body">
+        <p class="nav-caption">YOUR NEXT CHAPTER</p>
+        <ol class="journey">
+          <li id="step-prepare" class="current" aria-current="step"><span class="step-number">01</span><span>Prepare<span class="step-description">Set your direction</span></span></li>
+          <li id="step-interview"><span class="step-number">02</span><span>Practice<span class="step-description">Make your experience count</span></span></li>
+          <li id="step-report"><span class="step-number">03</span><span>Reflect<span class="step-description">Understand your readiness</span></span></li>
+        </ol>
+        <div class="sidebar-note"><span class="sparkle" aria-hidden="true">✦</span><h2>A better answer starts<br>with a better question.</h2><p>Your coach follows your experience, not a fixed script.</p></div>
+      </div>
+      <div class="sidebar-footer"><span class="tiny-dot" aria-hidden="true"></span> Built for your next opportunity<span class="edition">neatHack 2026</span></div>
+    </aside>
+
+    <div class="main-column">
+      <header class="topbar">
+        <span class="breadcrumb">Your career, in progress <span aria-hidden="true">/</span> <strong id="page-location">Interview preparation</strong></span>
+        <span class="product-pill"><span class="tiny-dot" aria-hidden="true"></span> Adaptive AI coach</span>
+      </header>
+      <main id="main" tabindex="-1">
+        <noscript><div class="notice error">JavaScript is required for the interview workspace. Enable it and reload this page.</div></noscript>
+        <div id="error-notice" class="notice error" role="alert" hidden><span class="notice-icon" aria-hidden="true">!</span><div><strong>Let’s get you back on track.</strong><p id="error-message"></p><details id="error-details" class="technical-details" hidden><summary>Development technical details</summary><dl><div id="diagnostic-category-row" hidden><dt>Category</dt><dd><code id="diagnostic-category"></code></dd></div><div id="diagnostic-stage-row" hidden><dt>Stage</dt><dd><code id="diagnostic-stage"></code></dd></div><div id="diagnostic-status-row" hidden><dt>Upstream HTTP status</dt><dd><code id="diagnostic-status"></code></dd></div></dl></details></div></div>
+        <div id="loading-notice" class="notice loading" role="status" hidden><span class="spinner" aria-hidden="true"></span><div><strong id="loading-title">Getting your session ready</strong><p id="loading-message">Your coach is reviewing the details.</p></div></div>
+        <p id="announcement" class="sr-only" role="status" aria-live="polite" aria-atomic="true"></p>
+
+        <section id="preparation-screen" aria-labelledby="preparation-title">
+          <div class="page-heading"><p class="eyebrow"><span aria-hidden="true">✦</span> PREPARE WITH PURPOSE</p><h1 id="preparation-title" tabindex="-1">Your next interview.<br><span>A more confident you.</span></h1><p class="lead">Bring your experience. We’ll bring the right questions.<br>A practice session shaped around you and the role you want.</p></div>
+          <div class="preparation-grid">
+            <section class="card preparation-card" aria-labelledby="profile-title">
+              <div class="card-heading"><div><span class="overline">LET’S MAKE IT PERSONAL</span><h2 id="profile-title">Build your interview brief</h2></div><span class="outline-icon" aria-hidden="true">↗</span></div>
+              <form id="preparation-form" method="post">
+                <div class="field"><label for="target-role">Target role <span class="required-label">Required</span></label><input id="target-role" name="target_role" type="text" required minlength="2" maxlength="200" placeholder="e.g. Junior PHP Developer" autocomplete="off" aria-describedby="role-help"><p class="field-help" id="role-help">The position you’re preparing for.</p></div>
+                <div class="field"><div class="label-row"><label for="cv-text">Your CV or experience</label><span class="input-caption">Upload or paste</span></div><div id="cv-dropzone" class="cv-upload-area"><input id="cv-file" type="file" class="sr-only" accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document" aria-describedby="cv-upload-help cv-upload-status"><label for="cv-file" class="cv-upload-target"><span class="upload-symbol" aria-hidden="true">↑</span><span class="upload-description"><strong>Bring your experience with you.</strong><span>Drop your CV here, or choose a file</span></span><span class="upload-chip">Browse</span></label><p id="cv-upload-help">PDF or DOCX · Up to 5 MB. Text is extracted on the server, not sent to AI.</p></div><p id="cv-upload-status" class="upload-status" role="status">Or paste your CV below. Review and edit the text before starting.</p><textarea id="cv-text" name="cv_text" rows="6" required minlength="30" maxlength="20000" placeholder="Share your projects, responsibilities, skills, and experience…" aria-describedby="cv-help cv-counter cv-upload-status"></textarea><div class="field-footer"><p class="field-help" id="cv-help">Give your coach the context to ask meaningful questions.</p><span id="cv-counter" class="counter">0 / 20,000 bytes</span></div></div>
+                <div class="field"><div class="label-row"><label for="job-description">Job description</label><span class="input-caption">Paste text</span></div><textarea id="job-description" name="job_description" rows="5" required minlength="30" maxlength="16000" placeholder="What is the employer looking for? Paste the role description here…" aria-describedby="job-help job-counter"></textarea><div class="field-footer"><p class="field-help" id="job-help">We’ll connect the role’s requirements to your experience.</p><span id="job-counter" class="counter">0 / 16,000 bytes</span></div></div>
+                <div class="form-bottom"><p class="small-note">Your brief is sent to the AI provider to tailor your practice and stored with your session.</p><button class="button primary" id="start-button" type="submit" disabled><span>Start interview</span><span aria-hidden="true">→</span></button></div>
+              </form>
+            </section>
+            <aside class="preparation-aside">
+              <div class="intro-art" aria-hidden="true"><div class="art-orbit orbit-one"></div><div class="art-orbit orbit-two"></div><span class="art-star">✦</span><div class="art-card art-card-back"></div><div class="art-card art-card-front"><span class="art-label">YOUR POTENTIAL</span><span class="art-bars"><i></i><i></i><i></i><i></i></span><span class="art-bottom">One conversation closer.</span></div><span class="art-tag">Built around you ↗</span></div>
+              <div class="expectations"><span class="overline">MORE THAN A MOCK INTERVIEW</span><h2>Practice that listens.</h2><ul><li><span aria-hidden="true">01</span><div><h3>A personalized plan</h3><p>Questions grounded in your experience and the role.</p></div></li><li><span aria-hidden="true">02</span><div><h3>Thoughtful follow-ups</h3><p>Go deeper where your answers need more detail.</p></div></li><li><span aria-hidden="true">03</span><div><h3>An honest reflection</h3><p>See the readiness assessment your coach provides.</p></div></li></ul></div>
+              <button type="button" id="back-to-session" class="button secondary full-width" hidden>Back to current session <span aria-hidden="true">→</span></button>
+              <details class="resume-panel"><summary>Already have an interview session?</summary><form id="resume-form" method="post"><label for="resume-id">Session ID</label><input id="resume-id" type="text" required placeholder="Paste your interview ID" autocomplete="off" spellcheck="false"><button class="button secondary full-width" type="submit" disabled>Resume interview <span aria-hidden="true">↗</span></button></form></details>
+            </aside>
+          </div>
+        </section>
+
+        <section id="workspace-screen" aria-labelledby="workspace-title" hidden>
+          <div class="workspace-heading"><div><p class="eyebrow">YOUR PRACTICE ROOM</p><h1 id="workspace-title" tabindex="-1">Let your experience speak.</h1><p class="lead" id="session-role"></p></div><button id="refresh-button" class="button secondary compact" type="button"><span aria-hidden="true">↻</span> Refresh progress</button></div>
+          <div class="session-strip"><span id="session-state" class="session-state"><span class="tiny-dot" aria-hidden="true"></span><span id="session-state-label">In progress</span></span><span id="answer-count">0 answers saved</span><span class="session-id-label">Session <code id="session-id"></code></span></div>
+          <div class="workspace-grid">
+            <div class="workspace-main">
+              <article id="question-card" class="card question-card" aria-labelledby="question-text">
+                <div class="question-topline"><span class="coach-avatar" aria-hidden="true">✦</span><div><strong>JobReady coach</strong><span>Focused on your growth</span></div><span id="question-kind" class="question-kind">New question</span></div>
+                <span id="question-focus" class="focus-label"></span><h2 id="question-text" tabindex="-1"></h2><p id="probe-reason" class="coach-context" hidden></p>
+                <div class="question-bottom"><span class="tiny-dot" aria-hidden="true"></span><span id="question-number">Question 1</span><span>Take a moment. Make it specific.</span></div>
+              </article>
+              <section id="answer-card" class="card answer-card" aria-labelledby="answer-title"><form id="answer-form" method="post"><div class="card-heading"><div><span class="overline">OVER TO YOU</span><h2 id="answer-title">Your answer</h2></div><span class="input-caption">Think it through</span></div><label class="sr-only" for="answer-text">Answer the current interview question</label><textarea id="answer-text" name="answer" required rows="7" maxlength="8000" placeholder="Describe the situation, what you did, and what happened next…" aria-describedby="answer-help answer-counter"></textarea><div class="field-footer"><p class="field-help" id="answer-help">Concrete examples help your coach understand your experience.</p><span id="answer-counter" class="counter">0 / 8,000 bytes</span></div><div class="answer-bottom"><span class="keyboard-hint"><kbd>Ctrl</kbd> + <kbd>Enter</kbd> to submit</span><button id="submit-answer" type="submit" class="button primary" disabled><span>Submit answer</span><span aria-hidden="true">→</span></button></div></form></section>
+              <p id="draft-storage-status" class="draft-status" role="status">Unsent drafts are remembered in this tab.</p>
+              <details id="draft-backup" class="card draft-backup" hidden><summary>Unsent draft from your previous question</summary><p id="draft-backup-text"></p></details>
+              <article id="readiness-card" class="card readiness-card" aria-labelledby="readiness-title" hidden><span class="report-symbol" aria-hidden="true">✦</span><p class="eyebrow">A MOMENT TO REFLECT</p><h2 id="readiness-title" tabindex="-1">Your readiness report</h2><span id="readiness-label" class="readiness-label"></span><p id="readiness-summary" class="report-summary"></p><p class="field-help">This is your coach’s assessment from this practice session, not a hiring decision or a numerical score.</p><div class="report-footer"><button class="button primary" id="report-new-session" type="button">Practice for another role <span aria-hidden="true">→</span></button></div></article>
+              <section class="card feedback-card" aria-labelledby="feedback-title"><div class="card-heading"><div><span class="overline">WHAT YOUR COACH NOTICED</span><h2 id="feedback-title">Evidence &amp; feedback</h2></div><span class="outline-icon" aria-hidden="true">◎</span></div><div id="evaluation-list"></div><p id="evaluation-empty" class="empty-copy">No evaluation has been returned yet. Your coach may ask a follow-up before drawing a conclusion.</p></section>
+              <section class="card history-card" aria-labelledby="history-title"><div class="card-heading"><div><span class="overline">YOUR CONVERSATION</span><h2 id="history-title">Practice journal</h2></div><span id="journal-count" class="input-caption">No saved answers yet</span></div><div id="history-list"></div><p id="history-empty" class="empty-copy">Your submitted questions and answers will appear here.</p></section>
+            </div>
+            <aside class="workspace-aside">
+              <section class="card plan-card" aria-labelledby="plan-title"><span class="overline">YOUR INTERVIEW MAP</span><h2 id="plan-title">A plan with purpose.</h2><span id="plan-depth" class="depth-label"></span><p id="plan-rationale"></p><h3 class="small-heading">Focus areas</h3><ul id="focus-list" class="focus-list"></ul></section>
+              <section class="coaching-note"><span aria-hidden="true">↗</span><h2>Specific beats perfect.</h2><p>Use an example you know well. Explain your own contribution, the reasoning behind it, and the result.</p></section>
+              <button id="new-session-button" type="button" class="button secondary full-width">Prepare a new session <span aria-hidden="true">＋</span></button>
+              <p class="session-note">Progress is saved on the server after a successful submission. Your session ID and unsent answer draft are remembered in this tab until the answer is saved or you start a new session.</p>
+            </aside>
+          </div>
+        </section>
+        <footer class="page-footer"><span>JobReady. Practice with purpose.</span><span>Thoughtful questions. Better preparation.</span></footer>
+      </main>
+    </div>
+  </div>
+</body>
+</html>

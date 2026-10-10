@@ -2,6 +2,9 @@
 declare(strict_types=1);
 
 use JobReady\Http\HttpException;
+use JobReady\Http\ErrorResponse;
+use JobReady\Documents\CvUpload;
+use JobReady\Documents\DocumentException;
 
 header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-store');
@@ -15,15 +18,51 @@ function jsonResponse(int $status, array $payload): never
 }
 
 try {
-    $services = require dirname(__DIR__) . '/config/bootstrap.php';
+    require_once dirname(__DIR__) . '/config/autoload.php';
     $method = strtoupper($_SERVER['REQUEST_METHOD'] ?? 'GET');
     $path = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?: '/';
+    // Extraction is independent of interview state, private .env, and AI/observability services.
+    if ($path === '/api/cv/extract') {
+        if ($method !== 'POST') {
+            jsonResponse(405, ['error' => 'Method not allowed.']);
+        }
+        if (strtolower(trim(explode(';', $_SERVER['CONTENT_TYPE'] ?? '')[0])) !== 'multipart/form-data') {
+            jsonResponse(415, ['error' => 'Upload a PDF or DOCX using multipart/form-data.', 'code' => 'unsupported']);
+        }
+        try {
+            $result = (new CvUpload())->extract($_FILES, (int) ($_SERVER['CONTENT_LENGTH'] ?? 0));
+            jsonResponse(200, $result);
+        } catch (DocumentException $exception) {
+            jsonResponse($exception->status, ['error' => $exception->getMessage(), 'code' => $exception->reason]);
+        } catch (Throwable) {
+            jsonResponse(503, ['error' => 'Document extraction is unavailable. You can still paste your CV text.', 'code' => 'unavailable']);
+        }
+    }
+    $services = require dirname(__DIR__) . '/config/bootstrap.php';
     if ($method === 'POST' && str_starts_with($path, '/api/interviews')) {
         set_time_limit(65);
     }
 
     if ($method === 'GET' && $path === '/') {
         jsonResponse(200, ['status' => 'ok', 'service' => 'JobReady']);
+    }
+
+    if ($path === '/api/dev/status') {
+        $enabled = in_array($services['environment'], ['local', 'development'], true)
+            && $services['debug'] === true;
+        if ($method !== 'GET' || !$enabled) {
+            throw new HttpException(404, 'Endpoint not found.');
+        }
+        // Explicit non-secret fields only; never serialize the environment or service container.
+        $model = $services['gemini_model'];
+        jsonResponse(200, [
+            'APP_ENV' => $services['environment'],
+            'debug_enabled' => $services['debug'],
+            'AI_PROVIDER' => $services['ai_provider'],
+            'GEMINI_MODEL' => preg_match('/^gemini-[a-zA-Z0-9.-]{1,100}$/D', $model) === 1 ? $model : null,
+            'diagnostics_enabled' => $enabled,
+            'sqlite_driver_available' => in_array('sqlite', PDO::getAvailableDrivers(), true),
+        ]);
     }
 
     $contentType = strtolower(trim(explode(';', $_SERVER['CONTENT_TYPE'] ?? '')[0]));
@@ -70,7 +109,11 @@ try {
 
     throw new HttpException(404, 'Endpoint not found.');
 } catch (HttpException $exception) {
-    jsonResponse($exception->status, ['error' => $exception->getMessage()]);
+    jsonResponse($exception->status, ErrorResponse::fromException(
+        $exception,
+        $services['environment'] ?? 'production',
+        ($services['debug'] ?? false) === true,
+    ));
 } catch (Throwable $exception) {
     error_log('JobReady request failed: ' . get_class($exception));
     jsonResponse(500, ['error' => 'An internal error occurred.']);

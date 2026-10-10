@@ -13,19 +13,7 @@ use JobReady\Storage\Database;
 use JobReady\Storage\InterviewStore;
 use JobReady\Storage\SessionStore;
 
-define('JOBREADY_ROOT', dirname(__DIR__));
-
-spl_autoload_register(static function (string $class): void {
-    $prefix = 'JobReady\\';
-    if (!str_starts_with($class, $prefix)) {
-        return;
-    }
-    $relative = substr($class, strlen($prefix));
-    $file = JOBREADY_ROOT . '/src/' . str_replace('\\', '/', $relative) . '.php';
-    if (is_file($file)) {
-        require $file;
-    }
-});
+require_once __DIR__ . '/autoload.php';
 
 Environment::load(JOBREADY_ROOT . '/.env');
 $databasePath = Environment::get('APP_DB_PATH', 'data/jobready.sqlite');
@@ -46,10 +34,11 @@ $neatlogsClient = ($writeKey !== null && trim($writeKey) !== '' && $project !== 
     : new NullNeatlogsClient();
 assert($neatlogsClient instanceof NeatlogsClientInterface);
 $provider = strtolower(trim(Environment::get('AI_PROVIDER', 'gemini') ?? 'gemini'));
+$geminiModel = Environment::get('GEMINI_MODEL', GeminiClient::DEFAULT_MODEL) ?? GeminiClient::DEFAULT_MODEL;
 $openAI = match ($provider) {
     'gemini' => new GeminiClient(
         Environment::get('GEMINI_API_KEY'),
-        Environment::get('GEMINI_MODEL', GeminiClient::DEFAULT_MODEL) ?? GeminiClient::DEFAULT_MODEL,
+        $geminiModel,
     ),
     'openai' => new OpenAIClient(
         Environment::get('OPENAI_API_KEY'),
@@ -62,6 +51,8 @@ $interviewService = new InterviewService($pdo, $interviewStore, $openAI, new Dec
 return [
     'environment' => Environment::get('APP_ENV', 'production'),
     'debug' => Environment::get('APP_DEBUG', 'false') === 'true',
+    'ai_provider' => $provider,
+    'gemini_model' => $geminiModel,
     'pdo' => $pdo,
     'session_store' => $sessionStore,
     'interview_store' => $interviewStore,

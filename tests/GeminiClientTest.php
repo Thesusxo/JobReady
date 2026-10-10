@@ -77,7 +77,7 @@ $calls = 0;
 $claimCalls = 0;
 $transport = static function (string $url, array $payload) use (&$mode, &$calls, &$claimCalls, $plan): array {
     $calls++;
-    geminiCheck($url === 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent', 'Incorrect REST model endpoint.');
+    geminiCheck($url === 'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent', 'Incorrect REST model endpoint.');
     geminiCheck(($payload['generationConfig']['responseMimeType'] ?? '') === 'application/json', 'JSON mode is missing.');
     geminiCheck(($payload['generationConfig']['maxOutputTokens'] ?? 0) <= 800, 'Output is not bounded.');
     geminiCheck(isset($payload['systemInstruction']['parts'][0]['text']), 'System instructions are missing.');
@@ -135,6 +135,9 @@ foreach (['quota' => 503, 'timeout' => 503, 'invalid_action' => 502] as $failure
         $rejected = true;
         geminiCheck($exception->status === $expectedStatus, 'Incorrect recovery status.');
         geminiCheck(!str_contains($exception->getMessage(), 'private provider detail'), 'Private details leaked to API error.');
+        geminiCheck(($exception->diagnostics['stage'] ?? null) === 'decision', 'Recovery lost the decision stage.');
+        $expectedCategory = ['quota' => 'quota_or_rate_limit', 'timeout' => 'transport', 'invalid_action' => 'invalid_output'][$failureMode];
+        geminiCheck(($exception->diagnostics['category'] ?? null) === $expectedCategory, 'Recovery lost the failure category.');
     }
     geminiCheck($rejected, 'Invalid turn was accepted.');
     $progress = $service->getProgress($started['id']);
