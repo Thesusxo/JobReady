@@ -4,3 +4,5 @@
 /vendor/
 /node_modules/
 *.log
+/data/*.sqlite
+/data/*.sqlite-*
