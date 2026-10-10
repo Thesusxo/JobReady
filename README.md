@@ -139,6 +139,18 @@ Run the local HTTP health test with `php tests/HealthEndpointTest.php`. It start
 
 Run `php tests/InterviewConnectivityTest.php` to check the interview API route without AI calls. It posts an empty JSON object to `/api/interviews` and expects HTTP 422 with a structured missing-field error, then checks malformed JSON returns HTTP 400. Both HTTP tests share the same isolated-server helper and require no existing development server. A pass establishes local routing/validation connectivity in the fixture, not Gemini availability or the state of your separate running server. Failure output includes only a fixed diagnostic phase.
 
+## Development Verification
+
+Run these offline checks from the repository root to verify the interview workflow, document extraction, and frontend HTTP assets:
+
+```sh
+php tests/InterviewWorkflowTest.php
+php tests/DocumentExtractionTest.php
+php tests/FrontendHttpTest.php
+```
+
+These tests use fictional fixtures and isolated storage without making live provider requests.
+
 ### Explicit neatlogs integration test
 
 The development test submits exactly one minimal trace named `jobready.integration_test` and contains no candidate data. It is **not sent automatically**. After setting a valid write key and project in your local `.env`, explicitly approve sending by running:
