@@ -141,7 +141,7 @@ Run `php tests/InterviewConnectivityTest.php` to check the interview API route w
 
 ## Development Verification
 
-Run these offline checks from the repository root to verify the interview workflow, document extraction, and frontend HTTP assets:
+Run these offline checks from the JobReady repository root—the directory containing `README.md` and `composer.json`—to verify the interview workflow, document extraction, and frontend HTTP assets:
 
 ```sh
 php tests/InterviewWorkflowTest.php
@@ -149,7 +149,7 @@ php tests/DocumentExtractionTest.php
 php tests/FrontendHttpTest.php
 ```
 
-These tests use fictional fixtures and isolated storage without making live provider requests.
+The interview workflow test uses a fake AI client, while the document extraction test processes fictional PDF/DOCX fixtures locally. Both run offline without Gemini API requests or API credits; the frontend HTTP test uses an isolated local server.
 
 ### Explicit neatlogs integration test
 
