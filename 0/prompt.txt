@@ -1,0 +1,865 @@
+We are building JobReady, an AI-powered adaptive interview preparation agent for neatHack 2026.
+Tech stack: PHP 8.2, vanilla HTML/CSS/JavaScript, OpenAI API, and neatlogs HTTP API for observability.
+
+First, inspect the existing repository and propose a minimal, secure project architecture. Explain how the agent will implement planning, tool use, state, context, execution, recovery, verification, and iteration.
+
+Include where neatlogs tracing will be integrated from the beginning.
+
+Do not create or modify files yet. Do not install dependencies. Do not request or expose API keys. Wait for my approval before implementation.
+
+---
+
+I approve the proposed JobReady architecture with these changes:
+1. Use SQLite through PHP PDO for durable interview session storage. Check whether the required PHP extensions are available.
+2. Design for a real bounded agent decision loop with explicit actions: ask_question, probe_answer, verify_claim, and finish_interview. Do not implement a fixed questionnaire disguised as an agent.
+3. Integrate neatlogs observability from the first working agent turn. Do not assume unsupported API fields.
+4. Keep the project framework-free using PHP 8.2 and vanilla HTML/CSS/JS.
+5. Keep credentials server-side in .env, provide .env.example with placeholders only, and never commit secrets.
+
+For this first implementation step ONLY:
+- Create the minimal folder structure and secure PHP bootstrap.
+- Create environment configuration loading.
+- Create the SQLite database initialization and session storage foundation.
+- Create a minimal public/index.php health-check endpoint.
+- Create a neatlogs client interface/stub, but do not send real traces yet.
+- Update README.md with local setup instructions.
+- Do not build the interview UI or call the OpenAI API yet.
+
+After implementation, run available syntax checks, report created files and test results, and stop for my review.
+
+Do not install unnecessary dependencies or commit/push changes automatically.
+
+---
+
+JobReady's local health check passed.
+Next, implement the neatlogs HTTP integration as a small, isolated development step.
+
+Requirements:
+1. Inspect the existing PHP architecture and observability interface.
+2. Use the documented neatlogs HTTP ingest endpoint:
+   https://ingest.neatlogs.com/v1/trace
+3. Authenticate using a server-side bearer token from .env.
+4. Implement a reusable NeatlogsClient using PHP cURL, with sensible timeouts and error handling.
+5. Add a development-only test script that sends one minimal, non-sensitive trace named "jobready.integration_test".
+6. Never expose the token in browser responses, logs, Git, or screenshots.
+7. Ensure tracing failures never crash JobReady.
+8. Update .env.example and README.md with placeholder configuration and testing instructions.
+9. Do not implement the interview agent or frontend yet.
+10. Run PHP syntax checks and stop for review.
+
+Do not send a real trace until I explicitly approve the test. Do not commit or push automatically.
+
+---
+
+Investigate why JobReady's neatlogs integration returns HTTP 403.
+The HTTP ingest key was copied from the correct field in the neatlogs dashboard, and the project is named "Ian's project".
+
+Please:
+
+1. Inspect `src/Observability/NeatlogsClient.php`, `scripts/test-neatlogs.php`, `src/Config/Environment.php`, and `config/bootstrap.php`.
+2. Verify that the request uses the correct endpoint, Bearer authorization header, JSON structure, and project name.
+3. Compare the implementation against the neatlogs HTTP API example, without exposing credentials.
+4. Check whether `.env` values are being parsed correctly, including quotes around the project name.
+5. Identify whether the 403 is likely caused by authentication, project permissions, or another issue.
+6. Report your findings and the smallest recommended fix.
+
+Do not print, reveal, log, or modify API keys. Do not send another HTTP request. Do not modify files yet. Stop for my review.
+
+---
+
+Please perform a security-only cleanup of JobReady.
+1. Inspect `.env.example` for any real or key-shaped credentials.
+2. Replace those values with obvious placeholders, preserving the correct configuration variable names.
+3. Confirm `.env` remains excluded from Git.
+4. Check whether any real credentials appear in Git-tracked files or existing commits.
+5. Do not display, repeat, or log any credential values.
+6. Do not read or modify my private `.env` file.
+7. Do not make network requests, commit, or push changes.
+
+Report only which files were changed, whether tracked files or commit history contain potential secrets, and whether any credential rotation is necessary.
+
+---
+
+The Neatlogs onboarding test succeeded using Git Bash curl, but `php scripts/test-neatlogs.php --send` consistently returns HTTP 403, even after rotating the HTTP ingest key.
+Investigate the difference between the successful documented curl request and our PHP NeatlogsClient request. Check the effective configuration, authentication header, request JSON, project name, and HTTP handling.
+
+Do not print, expose, or commit credentials. Do not send any HTTP requests yet. Identify the most likely cause and propose the smallest safe fix. Report your findings before modifying files.
+
+---
+
+Implement the smallest safe diagnostic improvement for our Neatlogs integration.
+Requirements:
+
+1. Update only the local development test and any minimal supporting code necessary.
+2. When the API returns HTTP 403, inspect the response and display only a sanitized error category and safe error code, if available.
+3. Never display or log the API key, Authorization header, raw response body, or sensitive request data.
+4. Distinguish a Neatlogs authentication/authorization error from a proxy or network-generated rejection where possible.
+5. Preserve existing production behavior and security protections.
+6. Run PHP syntax checks after the changes.
+7. Do not send any HTTP requests automatically.
+
+Stop after implementation and explain how to run the diagnostic test manually.
+
+---
+
+We are continuing development of JobReady for neatHack 2026.
+The PHP backend health check works, SQLite storage is initialized, and the Neatlogs client is implemented. Neatlogs ingestion from PHP currently encounters HTTP 403, which we will investigate separately.
+
+Our priority now is building a real adaptive AI interview agent.
+
+Implement the next milestone: a functional backend interview workflow.
+
+Requirements:
+
+1. Use PHP 8.2, SQLite, and the existing architecture.
+2. Implement a server-side OpenAI API client using a private environment variable.
+3. Allow a candidate to submit CV text, job description, and target role.
+4. Create an interview session and an individualized interview plan.
+5. Implement a bounded agent decision loop that can choose between ask_question, probe_answer, verify_claim, and finish_interview.
+6. Validate agent decisions and permitted tool arguments in PHP.
+7. Store interview sessions, questions, answers, decisions, and evaluations in SQLite.
+8. Make subsequent interview questions adapt to the candidate's earlier answers.
+9. Provide JSON endpoints to start an interview, submit an answer, and retrieve interview progress.
+10. Integrate the existing Neatlogs observability interface on agent turns, but allow interviews to continue if tracing fails.
+11. Treat CV and job description text as untrusted input. Never expose credentials or raw sensitive candidate data in logs.
+12. Add sensible API timeouts, error handling, and limits to avoid runaway agent loops.
+
+For this milestone, do not build the visual frontend yet.
+
+Run PHP syntax checks and any feasible automated tests. Do not make real OpenAI API requests without my approval. Do not automatically commit or push.
+
+Stop after implementation and report the files created, endpoints available, tests performed, and any unresolved issues.
+
+---
+
+We are building JobReady for neatHack 2026.
+The existing PHP interview agent passes its offline workflow tests. OpenAI API credits are unavailable, so we are switching the application to Google's Gemini API using the dedicated Gemini key already stored privately in `.env`.
+
+**Task: Integrate Gemini into the existing backend without rebuilding the interview agent.**
+
+Requirements:
+
+1. Inspect `src/AI/OpenAIClientInterface.php`, `src/AI/OpenAIClient.php`, `src/Interview/InterviewService.php`, `config/bootstrap.php`, and existing tests.
+2. Preserve the working agent decision loop, tool validation, SQLite storage, endpoints, and recovery behavior.
+3. Implement a Gemini API client using Google's official REST API and a currently supported text model with free-tier availability, subject to account quota.
+4. Preserve the existing AI client contract where possible. If necessary, introduce a provider-independent interface without breaking current tests.
+5. Use `GEMINI_API_KEY` from the private `.env` file. Never print, expose, log, or commit the key.
+6. Configure model and provider selection using environment variables, for example `AI_PROVIDER=gemini` and `GEMINI_MODEL`.
+7. Adapt Gemini response handling to the existing structured agent decisions. Validate generated JSON and reject invalid actions.
+8. Handle API errors, quota exhaustion, timeouts, and malformed responses safely.
+9. Keep neatlogs tracing best-effort so its existing HTTP 403 issue cannot break interviews.
+10. Update `.env.example` with placeholders and README with setup instructions.
+11. Add offline automated tests covering Gemini response parsing, invalid responses, and agent compatibility.
+12. Do not modify or remove the current interview endpoints or existing workflow tests.
+
+Run PHP syntax checks and all offline tests.
+
+**Do not make any real Gemini or OpenAI API requests yet. Do not commit or push changes automatically.**
+
+Stop after implementation and report the files changed, model selected, test results, and any unresolved issues.
+
+---
+
+JobReady is configured to use Gemini, and the PHP development server has been restarted.
+I authorize ONE live Gemini API test using fictional candidate information.
+
+Test the existing `POST /api/interviews` endpoint locally without modifying application code.
+
+Use this fictional candidate:
+
+**Target role:** Junior PHP Developer
+
+**CV text:**
+Kwame Mensah is a junior software developer with one year of experience building PHP and MySQL applications. He developed an inventory management system and understands HTML, CSS, JavaScript, and basic REST APIs.
+
+**Job description:**
+We are hiring a Junior PHP Developer who understands PHP, MySQL, REST APIs, debugging, and basic application security. Candidates should demonstrate problem-solving skills and an ability to work in a team.
+
+Requirements:
+1. Send only one interview-creation request to the local JobReady API.
+2. Allow the backend to make its real Gemini request.
+3. Report the HTTP status, whether the interview was created, whether a personalized plan was generated, and the opening question.
+4. If the request fails, report the sanitized error and stop.
+5. Do not expose or log API keys, authorization headers, or other credentials.
+6. Do not send real personal information.
+7. Do not modify files, commit changes, or push to GitHub.
+
+Stop after this one test and report the result.
+
+---
+
+We are continuing development of the JobReady hackathon project.
+First, inspect the existing repository and identify the current backend structure, test coverage, and unresolved issues.
+
+Do not modify files, install dependencies, make network requests, or commit changes.
+
+Give me a concise status report and wait for further instructions.
+
+---
+
+We are continuing JobReady development in a fresh OpenCode session with Entire enabled.
+Implement one small improvement: automated HTTP health endpoint testing.
+
+Requirements:
+
+1. Inspect the existing public/index.php routing and test structure.
+2. Add a lightweight automated test that verifies the GET / health endpoint returns HTTP 200 and valid JSON containing status "ok" and service "JobReady".
+3. Avoid external dependencies and use PHP 8.2.
+4. Do not make Gemini, OpenAI, or neatlogs API requests.
+5. Run the new test, both existing offline test suites, and PHP syntax checks.
+6. Do not modify the private .env file or expose credentials.
+7. Do not automatically commit or push changes.
+
+After implementation, stop and report the files changed, test results, and whether Entire recorded a checkpoint during this session.
+
+---
+
+We are continuing JobReady development after fixing Entire CLI availability on Windows.
+Before making changes, verify that Entire CLI is accessible in your execution environment.
+
+Run `entire --version` and `entire status`.
+
+Do not modify files, install dependencies, make API requests, or commit changes.
+
+Report whether Entire is accessible and enabled for this repository. Then stop.
+
+---
+
+We are continuing development of JobReady for neatHack 2026.
+Entire CLI is now accessible and enabled for OpenCode.
+
+Our first live interview creation attempt failed without returning an HTTP response. We need to diagnose this safely while preserving the existing working backend.
+
+Task: Improve local API connectivity diagnostics.
+
+1. Inspect the existing PHP server, interview routes, and HTTP test infrastructure.
+2. Add a lightweight automated connectivity test that checks whether the interview API is reachable and correctly rejects an invalid request with a structured JSON error.
+3. Use an isolated PHP server, temporary SQLite database, and credential-free test environment.
+4. Do not call Gemini, OpenAI, or neatlogs.
+5. Do not read or modify my private `.env` file.
+6. Preserve the existing application behavior and endpoints.
+7. Run the new test and all existing offline tests.
+8. Verify whether Entire records a checkpoint for this coding session using `entire checkpoint list`.
+9. Do not commit or push changes automatically.
+
+Stop after implementation and report the files changed, test results, and Entire checkpoint status.
+
+---
+
+Perform a final read-only security audit of JobReady's currently staged Git changes.
+Check for accidentally embedded API keys, passwords, bearer tokens, private credentials, sensitive candidate information, or local-only configuration.
+
+Pay particular attention to .env.example, PHP source files, tests, and README.md.
+
+Do not display or repeat any secrets you discover. Report only affected filenames and whether the staged files are safe to commit.
+
+Do not read my private .env file, modify files, make API requests, commit, or push.
+
+Also run git diff --cached --check and report whether it passes.
+
+---
+
+JobReady's PHP server is now running successfully at http://127.0.0.1:8000/.
+I authorize ONE live interview-creation test using the Gemini API and fictional candidate information.
+
+Use the existing POST /api/interviews endpoint.
+
+**Target role:** Junior PHP Developer
+
+**Fictional CV:**
+Kwame Mensah is a junior software developer with one year of experience building PHP and MySQL applications. He developed an inventory management system and understands HTML, CSS, JavaScript, and basic REST APIs.
+
+**Job description:**
+We are hiring a Junior PHP Developer who understands PHP, MySQL, REST APIs, debugging, basic application security, and teamwork.
+
+Requirements:
+1. Send exactly one POST request to http://127.0.0.1:8000/api/interviews.
+2. Allow the backend to contact Gemini.
+3. Use a reasonable request timeout of 90 seconds.
+4. Report the HTTP status, whether an interview was created, the personalized interview plan, and the opening question.
+5. If the request fails, report the sanitized error and stop.
+6. Do not print API keys, Authorization headers, or private configuration.
+7. Do not modify files, commit, or push changes.
+
+Stop after this single test and report the result.
+
+---
+
+JobReady's local API is running, but the first live Gemini interview-creation request returned HTTP 503 with the generic message "The interview service is temporarily unavailable."
+We need to identify the underlying cause before retrying.
+
+Please perform a read-only investigation:
+
+1. Inspect src/AI/GeminiClient.php, src/Interview/InterviewService.php, config/bootstrap.php, and public/index.php.
+2. Trace how Gemini API failures and response-parsing errors become HTTP 503.
+3. Identify whether the current implementation distinguishes HTTP 400, 401, 403, 404, 429, 500, and 503 from Gemini, as well as transport errors and invalid model output.
+4. Check whether the configured Gemini model and request structure are consistent with the Gemini generateContent API.
+5. Inspect existing safe application diagnostics, if available, without revealing secrets or private configuration.
+6. Recommend the smallest change needed to produce safe, structured development diagnostics that distinguish authentication, model availability, quota exhaustion, transport failure, and invalid AI output.
+
+Do not read or display API keys. Do not expose credentials or raw candidate data. Do not make any external API requests. Do not modify files, commit, or push.
+
+Report your findings and stop for review.
+
+---
+
+Implement safe, structured development diagnostics for JobReady's Gemini integration based on your previous investigation.
+Requirements:
+
+1. Extend AIUnavailableException with structured, allowlisted diagnostic fields.
+2. Classify Gemini failures into configuration, authentication, authorization, invalid_request, model_unavailable, quota_or_rate_limit, provider_unavailable, transport, and invalid_output.
+3. Preserve the stage of failure: plan, decision, or claim_verification.
+4. Record upstream HTTP status and numeric cURL error code when available.
+5. Preserve diagnostic metadata when InterviewService converts an AI exception into an HTTP error.
+6. Only expose sanitized diagnostic fields in API responses when APP_ENV is local/development AND APP_DEBUG=true.
+7. Keep production responses generic and unchanged.
+8. Never expose API keys, request headers, raw provider responses, prompts, CVs, job descriptions, or candidate answers.
+9. Add offline tests for representative Gemini error responses, transport failures, and safe diagnostic exposure.
+10. Preserve the existing interview workflow, SQLite transactions, and endpoints.
+11. Run all offline tests, PHP syntax checks, and git diff --check.
+
+Do not make live Gemini, OpenAI, or neatlogs requests. Do not modify my private .env file. Do not automatically commit or push changes.
+
+Stop after implementation and report the files changed, test results, and how to enable the diagnostics safely.
+
+---
+
+JobReady's local PHP server is running at http://127.0.0.1:8000, with APP_ENV=local and APP_DEBUG=true.
+I authorize exactly ONE live interview-creation request to diagnose the previous HTTP 503.
+
+Use POST http://127.0.0.1:8000/api/interviews with the following fictional candidate:
+
+Target role: Junior PHP Developer
+
+CV text:
+Kwame Mensah is a junior developer with one year of PHP and MySQL experience. He built a basic inventory management system and has experience with HTML, CSS, JavaScript, and REST APIs.
+
+Job description:
+We need a Junior PHP Developer with PHP, MySQL, debugging, REST API, application security, and teamwork skills.
+
+Requirements:
+1. Send exactly one HTTP POST to the local endpoint, with a 90-second timeout. The backend may make its normal Gemini calls for this request.
+2. If successful, report HTTP status, interview ID, personalized plan, and opening question.
+3. If unsuccessful, report HTTP status and only the sanitized development diagnostic fields: provider, operation, category, upstream_http_status, and curl_error_code, if present.
+4. Do not display raw provider responses, candidate input, API keys, headers, or private configuration.
+5. Do not retry the request.
+6. Do not modify files, commit, or push changes.
+
+Stop after this test and report the result.
+
+---
+
+JobReady still returns HTTP 503 for the live Gemini interview test, but none of the new development diagnostic fields appear in the response.
+Investigate why diagnostics are missing. Do not make any Gemini, OpenAI, or neatlogs API requests.
+
+Tasks:
+
+1. Inspect how config/bootstrap.php loads APP_ENV and APP_DEBUG.
+2. Inspect src/Config/Environment.php, src/Http/ErrorResponse.php, and public/index.php.
+3. Check whether environment variables can override .env settings.
+4. Determine whether APP_DEBUG=true is being interpreted correctly as a boolean.
+5. Check whether diagnostic fields are nested inside a JSON object rather than returned at the root.
+6. Verify that the development server can expose diagnostic fields using an isolated test with a fake AI client.
+7. Check whether the running server could be using stale configuration or a different project directory.
+8. Do not read, print, or modify my private .env file.
+9. Do not expose API keys, credentials, prompts, or candidate information.
+
+Report the most likely reason diagnostics are missing and the smallest fix.
+
+Do not modify application code yet. Do not commit or push changes.
+
+---
+
+JobReady's PHP server has been restarted with APP_ENV=local and APP_DEBUG=true, using the absolute path to the correct project's public directory.
+The health endpoint returns {"status":"ok","service":"JobReady"}.
+
+I authorize exactly ONE live interview-creation request to diagnose the Gemini HTTP 503.
+
+Send POST http://127.0.0.1:8000/api/interviews using this fictional candidate:
+
+Target role: Junior PHP Developer
+
+CV text:
+Kwame Mensah is a fictional junior developer with one year of PHP and MySQL experience. He built an inventory management application and knows HTML, CSS, JavaScript, and basic REST APIs.
+
+Job description:
+We need a Junior PHP Developer skilled in PHP, MySQL, REST APIs, debugging, application security, and teamwork.
+
+Requirements:
+1. Send exactly one request with a 90-second timeout.
+2. Do not retry automatically.
+3. Report the HTTP status.
+4. If successful, report the interview ID, personalized plan, and opening question.
+5. If unsuccessful, inspect the nested "diagnostics" object and report only its safe fields: provider, stage, category, upstream_http_status, and curl_error_code, when present.
+6. If diagnostics are absent, state that explicitly.
+7. Do not expose API keys, headers, raw provider responses, or private configuration.
+8. Do not modify files, commit, or push.
+
+Stop after this single test and report the result.
+
+---
+
+We need to resolve JobReady's persistent HTTP 503 without making another live Gemini request.
+The most recent POST /api/interviews returned HTTP 503 with no diagnostics object, even after explicitly starting PHP with APP_ENV=local and APP_DEBUG=true.
+
+Stop repeating live API tests. Perform a local-only diagnostic investigation.
+
+1. Inspect the complete exception-handling path from GeminiClient through InterviewService, HttpException, ErrorResponse, and public/index.php.
+2. Determine every code path that can produce HTTP 503 without a diagnostics object.
+3. Check whether the PHP server process on port 8000 belongs to the expected JobReady directory and whether multiple PHP servers are running.
+4. Verify effective APP_ENV, APP_DEBUG, AI_PROVIDER, and GEMINI_MODEL without revealing API keys or reading private .env contents.
+5. Compare the actual response structure expected from public/index.php against what previous tests reported.
+6. Use isolated offline tests and fake provider failures to reproduce any missing-diagnostics paths.
+7. Identify the exact root cause if possible. Otherwise, clearly distinguish confirmed findings from hypotheses.
+8. Recommend one minimal corrective action.
+
+Do not call Gemini, OpenAI, or neatlogs. Do not modify private .env, expose credentials, commit, or push. Do not modify application code yet.
+
+Stop and report findings.
+
+---
+
+We need to resolve JobReady's persistent HTTP 503 before continuing live Gemini tests.
+Implement a temporary, local-only runtime diagnostic endpoint.
+
+Requirements:
+
+1. Add GET /api/dev/status to the existing PHP router.
+2. The endpoint must be accessible ONLY when APP_ENV is exactly local or development AND APP_DEBUG is exactly true.
+3. It must report only:
+   - effective APP_ENV
+   - effective debug_enabled boolean
+   - effective AI_PROVIDER
+   - effective GEMINI_MODEL
+   - diagnostics_enabled boolean
+   - PHP SQLite driver availability
+4. Do not expose API keys, tokens, environment file contents, database paths, personal information, or other secrets.
+5. Return HTTP 404 when the development conditions are not satisfied.
+6. Do not modify or read my private .env file.
+7. Add automated tests verifying that the endpoint is available locally and inaccessible when debugging is disabled or the environment is production.
+8. Run all existing offline tests and PHP syntax checks.
+9. Do not make Gemini, OpenAI, or neatlogs requests.
+10. Do not commit or push changes.
+
+Stop after implementation and report the files changed and test results.
+
+---
+
+JobReady's live runtime endpoint confirms:
+APP_ENV=local
+debug_enabled=true
+AI_PROVIDER=gemini
+GEMINI_MODEL=gemini-2.5-flash-lite
+diagnostics_enabled=true
+sqlite_driver_available=true
+
+I authorize exactly ONE live POST request to http://127.0.0.1:8000/api/interviews.
+
+Use the fictional Junior PHP Developer candidate and job description from our previous tests.
+
+Requirements:
+1. Send exactly one request with a 90-second timeout.
+2. Report the HTTP status and whether the response is valid JSON.
+3. If successful, report whether an interview plan and opening question were generated.
+4. If unsuccessful, report the generic error message and only the safe fields inside the nested diagnostics object: provider, stage, category, upstream_http_status, and curl_error_code.
+5. If diagnostics are absent despite debug being confirmed, explicitly report that.
+6. Do not print credentials, headers, private configuration, or raw upstream Gemini responses.
+7. Do not retry, change files, commit, or push.
+
+Stop and report the result.
+
+---
+
+We have identified the live Gemini failure:
+provider=gemini
+stage=plan
+category=model_unavailable
+upstream_http_status=404
+
+The configured model is gemini-2.5-flash-lite.
+
+Google's current documentation indicates that access to Gemini 2.5 models may be restricted for newer projects.
+
+Perform ONE authorized, read-only request to Google's official Gemini ListModels REST endpoint using the GEMINI_API_KEY already configured privately in JobReady.
+
+Requirements:
+1. Use the official v1beta models listing endpoint.
+2. Load the key using JobReady's existing secure configuration mechanism.
+3. Do not print, log, expose, or commit the API key.
+4. List only model identifiers that support generateContent.
+5. Do not make any generateContent requests.
+6. Do not modify application files or private configuration.
+7. If the listing fails, report only the HTTP status and sanitized error category.
+8. Do not automatically retry.
+
+Recommend the most suitable available text model for a low-cost adaptive interview agent, but do not change the configured model yet.
+
+Stop and report the results.
+
+---
+
+The Gemini ListModels request succeeded with HTTP 200.
+Both gemini-2.5-flash-lite and gemini-3.1-flash-lite appear in the available model catalog with generateContent support.
+
+However, JobReady previously received HTTP 404 during interview planning.
+
+Task:
+
+1. Inspect GeminiClient.php and verify the exact REST URL construction for generateContent.
+2. Check for duplicate "models/" prefixes, incorrect API versions, URL encoding errors, or malformed endpoint paths.
+3. Use offline tests to verify the URL construction.
+4. If the endpoint is correct, recommend switching the configured model to gemini-3.1-flash-lite for our next test.
+5. Do not make any live Gemini requests.
+6. Do not read or modify my private .env file.
+7. Do not expose credentials, commit, or push changes.
+
+If a URL construction bug exists, fix only that bug and run the relevant offline tests.
+
+Otherwise, make no application changes.
+
+Stop and report your findings.
+
+---
+
+JobReady's live runtime status confirms:
+APP_ENV=local
+debug_enabled=true
+AI_PROVIDER=gemini
+GEMINI_MODEL=gemini-3.1-flash-lite
+diagnostics_enabled=true
+sqlite_driver_available=true
+
+I authorize ONE live interview-creation request to the existing local endpoint:
+
+POST http://127.0.0.1:8000/api/interviews
+
+Use this fictional candidate:
+
+Target role: Junior PHP Developer
+
+CV text:
+Kwame Mensah is a junior developer with one year of PHP and MySQL experience. He built an inventory management system and understands HTML, CSS, JavaScript, and basic REST APIs.
+
+Job description:
+We need a Junior PHP Developer with experience in PHP, MySQL, REST APIs, debugging, application security, and teamwork.
+
+Requirements:
+
+1. Send exactly one POST request with a 90-second timeout. Do not retry.
+2. If successful, report the HTTP status, interview ID, personalized plan, and opening question.
+3. If unsuccessful, report the HTTP status and only the sanitized diagnostics: provider, stage, category, upstream_http_status, and curl_error_code.
+4. Confirm whether the returned response is valid JSON.
+5. Do not expose API keys, authorization headers, or raw provider responses.
+6. Do not modify files, commit, or push changes.
+
+Stop after the test and report the result.
+
+---
+
+JobReady successfully created its first live Gemini-powered interview.
+Now test whether the agent can adapt to a weak candidate answer.
+
+Use the existing interview ID:
+c8d2995d-8ab0-434a-979b-9db5ef3f8946
+
+Send exactly ONE POST request to:
+http://127.0.0.1:8000/api/interviews/c8d2995d-8ab0-434a-979b-9db5ef3f8946/answers
+
+Fictional candidate answer:
+"I had an issue where the inventory system wasn't working properly. I checked the code, fixed some things, and eventually it worked."
+
+Requirements:
+1. Allow the backend to make its normal Gemini calls.
+2. Do not automatically retry.
+3. Report the HTTP status and selected agent action.
+4. Report the agent's evaluation, if returned.
+5. Report the next question or follow-up.
+6. Explain whether the response demonstrates adaptation to the vague answer.
+7. If unsuccessful, report only the sanitized error and diagnostic fields.
+8. Do not expose secrets, modify files, commit, or push.
+
+Stop after this one answer-submission request.
+
+---
+
+JobReady's live Gemini integration is now working.
+We successfully created an interview (HTTP 201), submitted a vague answer, and observed the agent intelligently select probe_answer (HTTP 200).
+
+Our next milestone is a polished, usable candidate-facing frontend.
+
+Tech stack: Vanilla HTML, CSS, JavaScript, and the existing PHP backend.
+
+Build the frontend using the existing API endpoints:
+- POST /api/interviews
+- POST /api/interviews/{id}/answers
+- GET /api/interviews/{id}
+
+Design direction:
+Create a premium, modern AI interview coaching application called JobReady. The interface should feel like a serious, polished SaaS product rather than a generic chatbot.
+
+Required experience:
+1. Landing/preparation screen with fields for target role, CV text, and job description.
+2. Start Interview button with clear loading and error states.
+3. Interview workspace showing the current AI question, answer input, progress, and relevant interview focus areas.
+4. Distinguish follow-up questions from new questions when the API response supports it.
+5. Show answer evaluations when available; do not fabricate scores.
+6. Provide a session summary and readiness report when the interview finishes, using only backend-provided data.
+7. Make the interface responsive for desktop and mobile.
+8. Use accessible controls, keyboard support, and readable typography.
+9. Safely render candidate and AI text without injecting HTML.
+10. Handle HTTP errors, unavailable Gemini service, and connection interruptions gracefully.
+11. Preserve the existing PHP backend, endpoints, and agent logic.
+12. Do not add React, build tools, or unnecessary dependencies.
+
+First inspect the exact existing API response schemas and implement the frontend against those contracts. Do not invent response fields.
+
+Run available checks and relevant automated tests.
+
+Do not make live Gemini requests, alter private .env, commit, or push automatically.
+
+Stop after implementation and report files changed, checks performed, and how to preview the interface locally.
+
+---
+
+We encountered HTTP 503 while submitting Question 5 of an active JobReady interview.
+Interview ID:
+5bfa6391-ab86-40f6-9d1d-037947041622
+
+Context:
+- Four answers are saved.
+- The fifth answer was submitted through the browser.
+- The browser received HTTP 503.
+- After refreshing progress, the interview remains on Question 5 with four saved answers.
+- Previous interview creation and adaptive follow-ups worked successfully.
+- Development diagnostics are enabled.
+
+Perform a read-only investigation.
+
+1. Inspect the PHP development server's existing error output, if available.
+2. Inspect the answer-submission path in InterviewService, GeminiClient, and the database transaction handling.
+3. Determine which failures can cause HTTP 503 at this stage.
+4. Examine whether Gemini rate limits, quota, response format, or a timeout could explain the failure.
+5. Check whether an existing application log or safe trace already identifies the cause.
+6. Do not read or expose private API keys, raw CV data, or candidate answers.
+7. Do not send another Gemini request or resubmit the answer.
+8. Do not modify files, commit, or push.
+
+Report confirmed findings separately from possible causes. Recommend the smallest corrective action.
+
+---
+
+JobReady's browser interview test encountered HTTP 503 while submitting Question 5.
+The session still shows four saved answers after refreshing, so the failed turn did not advance.
+
+The previous failed HTTP response is no longer available in Chrome DevTools.
+
+Improve the frontend's error handling without changing the agent's decision logic.
+
+Requirements:
+
+1. Inspect public/assets/interview-api.mjs and public/assets/app.mjs.
+2. Ensure API errors preserve sanitized diagnostic fields returned by the backend.
+3. When a request fails, display a clear, human-readable error message.
+4. In local/development mode only, allow a small technical-details section displaying the backend-provided diagnostic category, stage, and upstream HTTP status.
+5. Never display API keys, authorization headers, raw provider responses, CV text, or other sensitive information.
+6. Preserve an unsent answer draft when the request fails or the page refreshes.
+7. Prevent accidental duplicate answer submissions.
+8. Preserve the existing working interview session.
+9. Add offline tests for error handling and draft recovery.
+10. Do not make live Gemini, OpenAI, or neatlogs requests.
+11. Do not modify private .env, commit, or push changes.
+
+Run the relevant tests and report the changes.
+
+Stop after implementation.
+
+---
+
+Enhance JobReady's candidate preparation screen with secure CV document upload support.
+Support PDF (.pdf) and modern Word (.docx) files, while preserving the existing paste-text option.
+
+Requirements:
+
+1. Add an attractive upload area consistent with JobReady's existing premium interface.
+2. Allow the candidate to select a PDF or DOCX file, maximum 5 MB.
+3. Add a secure PHP endpoint that extracts readable text from uploaded files.
+4. Validate extension, actual file format, size, and upload errors server-side.
+5. Reject encrypted, malformed, unsupported, or oversized documents with clear errors.
+6. Use a safe, lightweight extraction method appropriate for PHP 8.2. Do not execute uploaded content.
+7. Do not allow ZIP bombs, unsafe file paths, or unrestricted XML parsing.
+8. Do not permanently store uploaded files. Delete temporary files promptly.
+9. Display the extracted text in the existing CV field so candidates can review and edit it before starting.
+10. Preserve all existing interview endpoints and agent logic.
+11. Handle scanned or image-only PDFs by explaining that readable text could not be extracted. OCR is not required for this MVP.
+12. Add automated tests using safe PDF and DOCX fixtures.
+13. Keep the interface responsive and accessible.
+14. Do not send uploaded CVs to Gemini until the candidate explicitly starts an interview.
+15. Do not read or modify private .env, make live provider requests, commit, or push.
+
+Inspect the existing frontend and backend architecture first, implement the smallest reliable solution, and run the relevant tests.
+
+Report changed files, test results, dependency requirements, and local preview instructions.
+
+---
+
+Perform a comprehensive pre-commit security and quality audit of the JobReady repository.
+Context:
+- JobReady's complete Gemini-powered interview workflow has been tested successfully.
+- PDF/DOCX CV uploading and extraction now work in the browser.
+- A real CV has been uploaded locally, so protecting personal information is especially important.
+- The latest code changes have not yet been committed or pushed.
+
+Tasks:
+
+1. Inspect Git status and identify all modified, untracked, and ignored files.
+2. Verify that .env, API credentials, uploaded CV files, temporary documents, SQLite databases, interview records, local logs, node_modules, vendor, and Entire/OpenCode runtime data are excluded from Git.
+3. Check all proposed commit files for embedded credentials, personal information, sensitive test data, and unsafe local configuration.
+4. Verify that composer.json and composer.lock are safe to commit, while vendor/ remains ignored.
+5. Review the PDF/DOCX upload security controls and confirm temporary file cleanup.
+6. Run all existing offline PHP and JavaScript tests, relevant syntax checks, and git diff --check.
+7. Identify exactly which source files, tests, documentation, and dependency manifests should be committed.
+8. Report any risks or required fixes before committing.
+
+Important:
+- Do not display or repeat secrets or personal CV content.
+- Do not read my private .env file or real uploaded CV contents.
+- Do not make live Gemini, OpenAI, or neatlogs requests.
+- Do not modify files, stage changes, commit, or push.
+- Report findings and stop for approval.
+
+---
+
+I approve the pre-commit fixes identified in your JobReady security audit.
+Implement only these changes:
+
+1. Strengthen the root .gitignore to exclude:
+   - .entire/ and .opencode/
+   - Local runtime data and SQLite databases, including backup and sidecar files
+   - Uploaded CV documents and temporary upload directories
+   - Local logs and debug output
+   - Private credential/configuration files such as auth.json
+   - Sensitive interview export files
+
+2. Ensure the ignore rules do not accidentally exclude application source code, README.md, composer.json, composer.lock, or PHP/JavaScript test fixtures.
+
+3. Update the non-secret default Gemini model from gemini-2.5-flash-lite to gemini-3.1-flash-lite in:
+   - .env.example
+   - GeminiClient::DEFAULT_MODEL
+   - Relevant README setup instructions
+
+4. Update any offline tests that explicitly depend on the previous default model, without weakening their assertions.
+
+5. Run all PHP and JavaScript tests, syntax checks, composer validation, and git diff --check.
+
+6. Verify that .env, installed dependencies, local data, uploaded documents, runtime logs, and Entire/OpenCode folders are excluded from Git.
+
+7. Report changed files, test results, and any remaining risks.
+
+Important:
+- Do not read, display, or modify my private .env file.
+- Do not read or expose my uploaded CV or interview records.
+- Do not delete any existing files or directories.
+- Do not make external API requests.
+- Do not stage, commit, or push anything yet.
+
+Stop after verification and report the results.
+
+---
+
+Perform a final READ-ONLY security audit of JobReady's currently staged Git changes before we create the commit.
+Inspect the complete staged contents of all 35 files.
+
+Verify:
+1. No embedded API keys, credentials, access tokens, passwords, or private configuration.
+2. No real CV information, candidate personal data, interview records, or local database content.
+3. No machine-specific paths or accidentally committed runtime files.
+4. composer.json and composer.lock contain no credential-bearing URLs.
+5. .gitignore protects private environment files, databases, uploaded documents, installed dependencies, and local Entire/OpenCode data.
+6. Run git diff --cached --check.
+7. Report whether the staged changes are safe to commit.
+
+Do not display any sensitive values if found. Identify only affected filenames and the nature of the issue.
+
+Do not modify files, stage additional changes, commit, push, or make API requests.
+
+Stop and report the verdict.
+
+---
+
+We are testing whether Entire is correctly capturing OpenCode Desktop development sessions for the JobReady repository.
+Please perform this small documentation-only task:
+
+1. Open README.md.
+2. Add a short section titled "Development Verification".
+3. Document these commands:
+   - php tests/InterviewWorkflowTest.php
+   - php tests/DocumentExtractionTest.php
+   - php tests/FrontendHttpTest.php
+4. Verify that the commands reference existing files.
+5. Save README.md and run git diff --check.
+6. Do not modify any other files.
+7. Do not access private .env files, API keys, CV data, or interview records.
+8. Do not make external API requests.
+9. Do not commit or push.
+
+Report the result and finish the task.
+
+---
+
+We are troubleshooting Entire checkpoint capture for JobReady.
+Entire CLI is enabled, and OpenCode CLI version 1.18.35 is now installed. OpenCode Desktop has been restarted.
+
+Perform a small, genuine documentation improvement:
+
+1. Review README.md's Development Verification section.
+2. Add a short explanation that the interview workflow and document extraction tests can be run offline without Gemini API requests.
+3. Avoid duplicating existing documentation.
+4. Modify README.md only.
+5. Run git diff --check.
+6. Do not access credentials, private CV information, or interview records.
+7. Do not make external API requests, commit, or push.
+
+Report the changes and finish.
+
+---
+
+Investigate why Entire CLI v0.11.4 is not capturing AI development checkpoints for the JobReady repository on Windows.
+Confirmed facts:
+- Entire is enabled on master.
+- Entire doctor reports Git hooks and OpenCode configuration OK.
+- .opencode/plugins/entire.ts exists.
+- OpenCode CLI v1.18.35 is installed.
+- OpenCode CLI can list sessions created by OpenCode Desktop.
+- AI-assisted file changes and Git commits have occurred.
+- Entire checkpoint list remains at zero.
+- The local .entire/logs/entire.log file exists.
+
+Perform a strictly read-only investigation:
+
+1. Inspect the existing Entire log for meaningful entries, including errors, session events, command failures, and hook execution.
+2. Inspect relevant Entire configuration and plugin hook definitions.
+3. Check whether the plugin relies on executable paths, environment variables, or events that may differ between OpenCode Desktop and CLI.
+4. Determine whether the captured session context is missing before Git commit or whether commit linking is failing.
+5. Report confirmed evidence separately from hypotheses.
+6. Recommend the smallest next corrective action, using Entire's documented behavior.
+
+Do not display raw log lines if they contain secrets, personal information, prompts, candidate data, or session transcripts.
+
+Do not read private .env files, modify files, reinstall software, run live API requests, commit, or push.
+
+Stop after reporting the findings.
+
+---
+
+We are verifying Entire session capture after fixing the missing Git Bash `sh` command on Windows and restarting OpenCode Desktop.
+Please perform a small, safe development task:
+
+1. Inspect README.md's Development Verification section.
+2. Add one useful clarification about running the offline tests from the JobReady repository root, if this is not already documented.
+3. Modify README.md only.
+4. Run git diff --check.
+5. Do not access private files, credentials, CVs, or interview records.
+6. Do not make external API requests.
+7. Do not commit or push.
+
+Finish the task and report the result.
