@@ -4,6 +4,7 @@ declare(strict_types=1);
 use JobReady\Config\Environment;
 use JobReady\AI\OpenAIClient;
 use JobReady\AI\GeminiClient;
+use JobReady\AI\GroqClient;
 use JobReady\Interview\DecisionValidator;
 use JobReady\Interview\InterviewService;
 use JobReady\Observability\NeatlogsClientInterface;
@@ -53,6 +54,10 @@ $openAI = match ($provider) {
     'openai' => new OpenAIClient(
         Environment::get('OPENAI_API_KEY'),
         Environment::get('OPENAI_MODEL', 'gpt-4o-mini') ?? 'gpt-4o-mini',
+    ),
+    'groq' => new GroqClient(
+        Environment::get('GROQ_API_KEY'),
+        Environment::get('GROQ_MODEL', GroqClient::DEFAULT_MODEL) ?? GroqClient::DEFAULT_MODEL,
     ),
     default => throw new RuntimeException('Unsupported AI provider configuration.'),
 };

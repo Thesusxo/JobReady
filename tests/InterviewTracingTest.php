@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 use JobReady\AI\AIUnavailableException;
 use JobReady\AI\AIModelMetadataInterface;
+use JobReady\AI\AIProviderMetadataInterface;
 use JobReady\AI\InterviewAIClientInterface;
 use JobReady\Http\HttpException;
 use JobReady\Interview\DecisionValidator;
@@ -156,5 +157,32 @@ interviewTraceCheck($failedTrace['children'][0]['status'] === 'OK', 'Completed p
 interviewTraceCheck($failedTrace['children'][4]['kind'] === 'AGENT' && $failedTrace['children'][4]['status'] === 'ERROR', 'Failed decision stage was not marked as failed.');
 interviewTraceCheck($failedTrace['children'][5]['attributes']['neatlogs.task.key'] === 'transaction_rollback', 'Actual rollback was not recorded.');
 interviewTraceCheck(!str_contains(json_encode($failureTracer->traces), 'Private decision error.'), 'Provider exception text entered telemetry.');
+
+$groqTracer = new class implements StructuredTraceClientInterface {
+    public array $traces = [];
+    public function recordTrace(array $trace): bool { $this->traces[] = $trace; return true; }
+    public function recordEvent(string $name, array $attributes = []): bool { return false; }
+};
+$groqModel = new class implements InterviewAIClientInterface, AIModelMetadataInterface, AIProviderMetadataInterface {
+    public function modelName(): string { return 'openai/gpt-oss-20b'; }
+    public function providerName(): string { return 'groq'; }
+    public function createPlan(array $candidate): array
+    {
+        return ['focus_areas' => ['Testing', 'Reliability'], 'rationale' => 'Fictional fixture.', 'suggested_depth' => 'beginner'];
+    }
+    public function decide(array $context): array
+    {
+        return ['action' => 'ask_question', 'rationale' => 'Fictional fixture.', 'arguments' => ['question' => 'Describe a test.', 'focus' => 'Testing']];
+    }
+    public function verifyClaim(array $context, string $claim): array
+    {
+        return ['evidence' => 'unclear', 'explanation' => 'Fictional fixture.', 'follow_up_focus' => 'Testing'];
+    }
+};
+[$groqService, $groqCandidate] = interviewTraceFixture($groqModel, $groqTracer);
+$groqService->start($groqCandidate);
+$groqLlmSpan = $groqTracer->traces[0]['children'][0];
+interviewTraceCheck(($groqLlmSpan['provider'] ?? null) === 'groq'
+    && ($groqLlmSpan['model'] ?? null) === 'openai/gpt-oss-20b', 'Selected Groq provider/model metadata missing from trace.');
 
 echo "Interview structured-tracing tests passed (nested operations, grouping, measured duration, privacy, rollback, best-effort failure).\n";

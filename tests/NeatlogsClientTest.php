@@ -115,7 +115,7 @@ namespace {
                 'neatlogs.agent.input' => 'OPAQUE_FICTIONAL_ANSWER',
             ],
             'children' => [
-                ['name' => 'decide_next_interview_action', 'kind' => 'LLM', 'model' => 'gemini-3.1-flash-lite', 'duration_ms' => 7],
+                ['name' => 'decide_next_interview_action', 'kind' => 'LLM', 'provider' => 'groq', 'model' => 'openai/gpt-oss-20b', 'duration_ms' => 7],
                 ['name' => 'validate_agent_decision', 'kind' => 'GUARDRAIL', 'passed' => true, 'duration_ms' => 0.2],
                 ['name' => 'persist_selected_interview_question', 'kind' => 'TASK', 'attributes' => ['neatlogs.task.key' => 'probe_answer'], 'duration_ms' => 0.1],
             ],
@@ -130,7 +130,8 @@ namespace {
     ], 'Session grouping or root attribute allowlist failed.');
     traceCheck($trace['children'][0]['kind'] === 'AGENT', 'Nested agent span missing.');
     traceCheck(array_column($trace['children'][0]['children'], 'kind') === ['LLM', 'GUARDRAIL', 'TASK'], 'Nested LLM/validation/task steps were lost.');
-    traceCheck($trace['children'][0]['children'][0]['model'] === 'gemini-3.1-flash-lite', 'Safe model identifier missing.');
+    traceCheck($trace['children'][0]['children'][0]['provider'] === 'groq'
+        && $trace['children'][0]['children'][0]['model'] === 'openai/gpt-oss-20b', 'Safe provider/model identifiers missing.');
     traceCheck(!str_contains(CurlFixture::$options[CURLOPT_POSTFIELDS], 'OPAQUE_'), 'Sensitive inputs/outputs were transmitted.');
     traceCheck(CurlFixture::$requests === 1, 'Structured trace submit retried.');
     CurlFixture::reset();

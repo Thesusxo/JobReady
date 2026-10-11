@@ -66,6 +66,18 @@ try {
 $server = new IsolatedHttpServer('local', true);
 try {
     $fixture = (new ReflectionProperty($server, 'fixture'))->getValue($server);
+    file_put_contents($fixture . '/.env', "APP_ENV=local\nAPP_DEBUG=true\nAPP_DB_PATH=data/test.sqlite\nAI_PROVIDER=groq\nGROQ_API_KEY=\nGROQ_MODEL=openai/gpt-oss-20b\nGEMINI_API_KEY=\nOPENAI_API_KEY=\nNEATLOGS_WRITE_KEY=\n");
+    $response = $server->request('GET', '/api/dev/status');
+    statusCheck($response['status'] === 200 && $response['json']['AI_PROVIDER'] === 'groq',
+        'Groq provider selection did not construct through the configuration factory.');
+    statusCheck(count($response['json']) === 6, 'Groq selection exposed unexpected runtime data.');
+} finally {
+    $server->stop();
+}
+
+$server = new IsolatedHttpServer('local', true);
+try {
+    $fixture = (new ReflectionProperty($server, 'fixture'))->getValue($server);
     file_put_contents($fixture . '/.env', "APP_ENV=local\nAPP_DEBUG=true\nAPP_DB_PATH=data/test.sqlite\nAI_PROVIDER=gemini\nGEMINI_MODEL=SYNTHETIC_PRIVATE_MARKER\nGEMINI_API_KEY=\nOPENAI_API_KEY=\nNEATLOGS_WRITE_KEY=\n");
     $response = $server->request('GET', '/api/dev/status');
     statusCheck($response['status'] === 200 && $response['json']['GEMINI_MODEL'] === null,

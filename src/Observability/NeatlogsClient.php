@@ -114,8 +114,12 @@ final class NeatlogsClient implements StructuredTraceClientInterface
             return null;
         }
         $safe = ['name' => $node['name'], 'kind' => $kind];
+        if (isset($node['provider']) && $kind === 'LLM'
+            && in_array($node['provider'], ['gemini', 'openai', 'groq'], true)) {
+            $safe['provider'] = $node['provider'];
+        }
         if (isset($node['model']) && $kind === 'LLM' && is_string($node['model'])
-            && preg_match('/^(?:gemini|gpt)[a-zA-Z0-9._-]{0,80}$/', $node['model'])) {
+            && preg_match('/^(?:gemini-[a-zA-Z0-9.-]{1,100}|gpt-[a-zA-Z0-9.-]{1,80}|openai\/gpt-oss-20b)$/D', $node['model'])) {
             $safe['model'] = $node['model'];
         }
         if (isset($node['tool_name']) && in_array($node['tool_name'], ['interview_plan', 'interview_decision', 'claim_verification'], true)) {

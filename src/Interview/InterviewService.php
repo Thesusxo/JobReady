@@ -5,6 +5,7 @@ namespace JobReady\Interview;
 
 use JobReady\AI\AIUnavailableException;
 use JobReady\AI\AIModelMetadataInterface;
+use JobReady\AI\AIProviderMetadataInterface;
 use JobReady\AI\InterviewAIClientInterface;
 use JobReady\Http\HttpException;
 use JobReady\Observability\NeatlogsClientInterface;
@@ -331,8 +332,14 @@ final class InterviewService
         $span = ['name' => $name, 'kind' => 'LLM', 'status' => $status, 'duration_ms' => $this->elapsedMs($started)];
         if ($this->openAI instanceof AIModelMetadataInterface) {
             $model = $this->openAI->modelName();
-            if (preg_match('/^(?:gemini|gpt)[A-Za-z0-9._-]{0,80}$/', $model)) {
+            if (preg_match('/^(?:gemini-[A-Za-z0-9.-]{1,100}|gpt-[A-Za-z0-9.-]{1,80}|openai\/gpt-oss-20b)$/D', $model)) {
                 $span['model'] = $model;
+            }
+        }
+        if ($this->openAI instanceof AIProviderMetadataInterface) {
+            $provider = $this->openAI->providerName();
+            if (in_array($provider, ['gemini', 'openai', 'groq'], true)) {
+                $span['provider'] = $provider;
             }
         }
         if ($error !== null) {

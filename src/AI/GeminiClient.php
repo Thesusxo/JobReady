@@ -8,7 +8,7 @@ use JsonException;
 use stdClass;
 use Throwable;
 
-final class GeminiClient implements InterviewAIClientInterface, AIModelMetadataInterface
+final class GeminiClient implements InterviewAIClientInterface, AIModelMetadataInterface, AIProviderMetadataInterface
 {
     public const DEFAULT_MODEL = 'gemini-3.1-flash-lite';
     private const MAX_RESPONSE_BYTES = 65536;
@@ -27,6 +27,11 @@ final class GeminiClient implements InterviewAIClientInterface, AIModelMetadataI
     public function modelName(): string
     {
         return $this->model;
+    }
+
+    public function providerName(): string
+    {
+        return 'gemini';
     }
 
     public function createPlan(array $candidate): array
@@ -127,7 +132,7 @@ final class GeminiClient implements InterviewAIClientInterface, AIModelMetadataI
                 CURLOPT_POSTFIELDS => json_encode($payload, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE),
                 CURLOPT_HTTPHEADER => ['x-goog-api-key: ' . $this->apiKey, 'Content-Type: application/json', 'Accept: application/json'],
                 CURLOPT_CONNECTTIMEOUT => 3,
-                CURLOPT_TIMEOUT => 12,
+                CURLOPT_TIMEOUT => 30,
                 CURLOPT_FOLLOWLOCATION => false,
                 CURLOPT_PROTOCOLS => CURLPROTO_HTTPS,
                 CURLOPT_SSL_VERIFYPEER => true,
