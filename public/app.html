@@ -75,7 +75,39 @@
                 <span id="question-focus" class="focus-label"></span><h2 id="question-text" tabindex="-1"></h2><p id="probe-reason" class="coach-context" hidden></p>
                 <div class="question-bottom"><span class="tiny-dot" aria-hidden="true"></span><span id="question-number">Question 1</span><span>Take a moment. Make it specific.</span></div>
               </article>
-              <section id="answer-card" class="card answer-card" aria-labelledby="answer-title"><form id="answer-form" method="post"><div class="card-heading"><div><span class="overline">OVER TO YOU</span><h2 id="answer-title">Your answer</h2></div><span class="input-caption">Think it through</span></div><label class="sr-only" for="answer-text">Answer the current interview question</label><textarea id="answer-text" name="answer" required rows="7" maxlength="8000" placeholder="Describe the situation, what you did, and what happened next…" aria-describedby="answer-help answer-counter"></textarea><div class="field-footer"><p class="field-help" id="answer-help">Concrete examples help your coach understand your experience.</p><span id="answer-counter" class="counter">0 / 8,000 bytes</span></div><div class="answer-bottom"><span class="keyboard-hint"><kbd>Ctrl</kbd> + <kbd>Enter</kbd> to submit</span><button id="submit-answer" type="submit" class="button primary" disabled><span>Submit answer</span><span aria-hidden="true">→</span></button></div></form></section>
+              <section id="answer-card" class="card answer-card" aria-labelledby="answer-title">
+                <form id="answer-form" method="post">
+                  <div class="card-heading"><div><span class="overline">OVER TO YOU</span><h2 id="answer-title">Your answer</h2></div><span class="input-caption">Think it through</span></div>
+                  <div class="voice-mode-switch">
+                    <div><span class="voice-mode-kicker">OPTIONAL VOICE MODE</span><p>Listen to the question or dictate an editable answer.</p></div>
+                    <button id="voice-mode-toggle" class="button secondary compact" type="button" aria-pressed="false" aria-controls="voice-controls">Enable voice mode</button>
+                  </div>
+                  <section id="voice-controls" class="voice-controls" aria-label="Voice interview controls" hidden>
+                    <div class="voice-control-group">
+                      <p class="voice-control-label">QUESTION AUDIO</p>
+                      <div class="voice-button-row">
+                        <button id="voice-listen-button" class="button secondary compact" type="button">Listen</button>
+                        <button id="voice-replay-button" class="button secondary compact" type="button" disabled>Replay</button>
+                        <button id="voice-stop-speech-button" class="button secondary compact" type="button" disabled>Stop playback</button>
+                      </div>
+                    </div>
+                    <div class="voice-control-group">
+                      <p class="voice-control-label">ANSWER DICTATION</p>
+                      <div class="voice-button-row">
+                        <button id="voice-start-listening" class="button secondary compact" type="button" aria-describedby="voice-privacy-note">Start dictation</button>
+                        <button id="voice-stop-listening" class="button secondary compact" type="button" hidden disabled>Stop dictation</button>
+                      </div>
+                      <p id="voice-status" class="voice-status" data-state="stopped" role="status" aria-live="polite" aria-atomic="true">Voice mode is ready. Start dictation only when you choose.</p>
+                      <p id="voice-transcript-preview" class="voice-transcript-preview" aria-live="off" hidden></p>
+                      <p id="voice-privacy-note" class="voice-privacy-note">Browser speech recognition may use an external service, depending on your browser. JobReady does not record or upload microphone audio. Review and edit the transcript before submitting.</p>
+                    </div>
+                  </section>
+                  <label class="sr-only" for="answer-text">Answer the current interview question</label>
+                  <textarea id="answer-text" name="answer" required rows="7" maxlength="8000" placeholder="Describe the situation, what you did, and what happened next…" aria-describedby="answer-help answer-counter"></textarea>
+                  <div class="field-footer"><p class="field-help" id="answer-help">Concrete examples help your coach understand your experience.</p><span id="answer-counter" class="counter">0 / 8,000 bytes</span></div>
+                  <div class="answer-bottom"><span class="keyboard-hint"><kbd>Ctrl</kbd> + <kbd>Enter</kbd> to submit</span><button id="submit-answer" type="submit" class="button primary" disabled><span>Submit answer</span><span aria-hidden="true">→</span></button></div>
+                </form>
+              </section>
               <p id="draft-storage-status" class="draft-status" role="status">Unsent drafts are remembered in this tab.</p>
               <details id="draft-backup" class="card draft-backup" hidden><summary>Unsent draft from your previous question</summary><p id="draft-backup-text"></p></details>
               <article id="readiness-card" class="card readiness-card" aria-labelledby="readiness-title" hidden><p class="eyebrow">A MOMENT TO REFLECT</p><h2 id="readiness-title" tabindex="-1">Your readiness report</h2><span id="readiness-label" class="readiness-label"></span><p id="readiness-summary" class="report-summary"></p><p class="field-help">This is your coach’s assessment from this practice session, not a hiring decision or a numerical score.</p><div class="report-footer"><button class="button primary" id="report-new-session" type="button">Practice for another role <span aria-hidden="true">→</span></button></div></article>

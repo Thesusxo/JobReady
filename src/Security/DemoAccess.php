@@ -12,7 +12,7 @@ final class DemoAccess
     private const SESSION_TTL = 8 * 60 * 60;
     private const INTERVIEW_STARTS_PER_IP_HOUR = 2;
     private const INTERVIEW_STARTS_GLOBAL_PER_DAY = 10;
-    private const ANSWERS_PER_SESSION_HOUR = 8;
+    private const ANSWERS_PER_SESSION_HOUR = 20;
     private const ANSWERS_PER_IP_HOUR = 20;
     private const ANSWERS_GLOBAL_PER_DAY = 40;
     private const UPLOADS_PER_IP_HOUR = 3;

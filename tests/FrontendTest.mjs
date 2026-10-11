@@ -228,7 +228,22 @@ test('preparation, follow-up, refresh recovery, and completion UI work with a fa
     createElement: tag => new Node(tag),
     querySelectorAll: () => [...nodes.values()].filter(node => ['input', 'textarea', 'button'].includes(node.tag)),
   };
-  globalThis.window = { addEventListener() {} };
+  const spokenQuestions = [];
+  class FakeUtterance {
+    constructor(text) { this.text = text; }
+  }
+  const synthesis = { cancelCalls: 0, speak: utterance => spokenQuestions.push(utterance), cancel() { this.cancelCalls++; } };
+  const recognitions = [];
+  class FakeRecognition {
+    constructor() { recognitions.push(this); }
+    start() { this.startCalls = (this.startCalls ?? 0) + 1; }
+    stop() { this.stopCalls = (this.stopCalls ?? 0) + 1; this.onend?.(); }
+    abort() { this.abortCalls = (this.abortCalls ?? 0) + 1; this.onend?.(); }
+  }
+  globalThis.window = {
+    addEventListener() {}, SpeechSynthesisUtterance: FakeUtterance, speechSynthesis: synthesis,
+    SpeechRecognition: FakeRecognition,
+  };
   globalThis.sessionStorage = { getItem: key => stored.get(key) ?? null, setItem: (key, value) => stored.set(key, value), removeItem: key => stored.delete(key) };
   const requests = [];
   const csrf = 'a'.repeat(64);
@@ -284,6 +299,46 @@ test('preparation, follow-up, refresh recovery, and completion UI work with a fa
   assert.equal(nodes.get('cv-text').value, '');
   assert.deepEqual([...stored.entries()], [['jobready.session-id', id]], 'Only the session ID may be persisted in this tab.');
 
+  assert.equal(nodes.get('voice-mode-toggle').attributes.get('aria-pressed'), 'false', 'Voice mode must default to off.');
+  assert.equal(spokenQuestions.length, 0, 'Question speech must never autoplay.');
+  await nodes.get('voice-mode-toggle').fire('click');
+  assert.equal(nodes.get('voice-controls').hidden, false, 'Voice controls should appear only after opt-in.');
+  await nodes.get('voice-listen-button').fire('click');
+  assert.equal(spokenQuestions.length, 1);
+  assert.equal(spokenQuestions[0].text, initial().current_question);
+  spokenQuestions[0].onstart();
+  spokenQuestions[0].onend();
+  await nodes.get('voice-replay-button').fire('click');
+  assert.equal(spokenQuestions.length, 2, 'Replay must speak the current question on request.');
+  await nodes.get('voice-stop-speech-button').fire('click');
+  assert.ok(synthesis.cancelCalls >= 2, 'Stop must cancel current speech.');
+  await nodes.get('voice-listen-button').fire('click');
+  const cancelCountBeforeQuestionChange = synthesis.cancelCalls;
+  spokenQuestions.at(-1).onstart();
+
+  nodes.get('answer-text').value = 'A typed lead-in.';
+  await nodes.get('voice-start-listening').fire('click');
+  assert.equal(recognitions.length, 1, 'Microphone must start only after explicit click.');
+  recognitions[0].onstart();
+  const spokenAnswer = [{ transcript: 'I wrote fictional PHP test cases.' }];
+  spokenAnswer.isFinal = true;
+  recognitions[0].onresult({ results: [spokenAnswer] });
+  await nodes.get('voice-stop-listening').fire('click');
+  assert.equal(nodes.get('answer-text').value, 'A typed lead-in.\nI wrote fictional PHP test cases.', 'Speech transcript must preserve existing text in the editable answer field.');
+  assert.equal(requests.length, 5, 'Transcription must never submit an answer automatically.');
+  assert.match(nodes.get('voice-status').textContent, /Review your editable answer/);
+
+  await nodes.get('voice-start-listening').fire('click');
+  assert.equal(recognitions.length, 2);
+  recognitions[1].onstart();
+  recognitions[1].onend();
+  assert.equal(nodes.get('voice-status').attributes.get('data-state'), 'waiting');
+  await nodes.get('voice-mode-toggle').fire('click');
+  assert.equal(nodes.get('voice-controls').hidden, true);
+  await new Promise(resolve => setTimeout(resolve, 500));
+  assert.equal(recognitions.length, 2, 'Disabling Voice Mode must cancel pending automatic restarts.');
+  assert.equal(requests.length, 5, 'Voice Mode transitions must not issue interview requests.');
+
   nodes.get('answer-text').value = 'I checked some code.';
   await nodes.get('answer-text').fire('input');
   assert.equal(JSON.parse(stored.get(DRAFT_STORAGE_KEY)).text, 'I checked some code.');
@@ -315,6 +370,7 @@ test('preparation, follow-up, refresh recovery, and completion UI work with a fa
   assert.equal(nodes.get('answer-text').value, 'I checked some code.');
   await nodes.get('answer-form').fire('submit');
   assert.equal(nodes.get('question-kind').textContent, 'Follow-up');
+  assert.ok(synthesis.cancelCalls > cancelCountBeforeQuestionChange, 'Changing questions must stop active speech.');
   assert.equal(nodes.get('question-text').textContent, followedUp().current_question);
   assert.equal(nodes.get('question-text').childElementCount, 0, 'AI markup must remain a text node.');
   assert.equal(nodes.get('evaluation-empty').hidden, false, 'No scores/evaluations should be invented for a probe.');

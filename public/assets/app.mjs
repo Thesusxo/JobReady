@@ -3,6 +3,7 @@ import {
 } from './interview-api.mjs';
 import { captureDraft, createDraftStore, recoverDraft } from './answer-draft.mjs';
 import { createCvUploadApi } from './cv-upload.mjs';
+import { createVoiceInterview } from './voice-interview.mjs';
 
 const $ = id => document.getElementById(id);
 let csrfToken = null;
@@ -17,7 +18,28 @@ let busy = false;
 let needsRefresh = false;
 let failedSubmission = null;
 let submittingAnswer = false;
+let voiceModeEnabled = false;
 const controls = [...document.querySelectorAll('form input, form textarea, button')];
+const voice = createVoiceInterview({
+  windowObject: globalThis.window,
+  onStatus: message => { $('voice-status').textContent = message; },
+  onPreview: transcript => {
+    $('voice-transcript-preview').textContent = transcript;
+    $('voice-transcript-preview').hidden = !transcript;
+  },
+  onTranscript: transcript => {
+    if (!voiceModeEnabled || busy || !session || session.status !== 'active' || !transcript.trim()) return;
+    const answer = $('answer-text');
+    const separator = answer.value && !/\s$/.test(answer.value) ? '\n' : '';
+    answer.value += `${separator}${transcript.trim()}`;
+    updateCounters();
+    persistDraft();
+    answer.focus();
+    if (typeof answer.setSelectionRange === 'function') answer.setSelectionRange(answer.value.length, answer.value.length);
+    announce('Speech transcription added to your answer. Review and edit it before submitting.');
+  },
+  onStateChange: () => syncVoiceControls(),
+});
 
 // Every dynamic candidate/AI value is a text node. Never render it as markup.
 function element(tag, className, content) {
@@ -70,9 +92,32 @@ function persistDraft(pending = needsRefresh) {
 
 function updateControls() {
   for (const control of controls) control.disabled = busy;
-  $('submit-answer').disabled = busy || needsRefresh || !session || session.status !== 'active';
+  $('submit-answer').disabled = busy || needsRefresh || !session || session.status !== 'active'
+    || voice.getState().dictationEnabled || voice.getState().recognitionState === 'stopping';
   $('answer-text').disabled = busy || !session || session.status !== 'active';
   $('back-to-session').hidden = !session;
+  syncVoiceControls();
+}
+function syncVoiceControls() {
+  const activeSession = Boolean(session && session.status === 'active');
+  const available = voiceModeEnabled && activeSession && !busy;
+  const state = voice.getState();
+  $('voice-mode-toggle').disabled = busy || !activeSession;
+  $('voice-mode-toggle').setAttribute('aria-pressed', String(voiceModeEnabled));
+  $('voice-mode-toggle').textContent = voiceModeEnabled ? 'Disable voice mode' : 'Enable voice mode';
+  $('voice-controls').hidden = !voiceModeEnabled;
+  $('voice-status').setAttribute('data-state', state.recognitionState);
+  $('voice-listen-button').disabled = !available || !state.speechSupported || !$('question-text').textContent.trim();
+  $('voice-replay-button').disabled = !available || !state.speechSupported || !state.hasSpokenQuestion;
+  $('voice-stop-speech-button').disabled = !available || !state.speaking;
+  $('voice-start-listening').hidden = state.dictationEnabled || state.recognitionState === 'stopping';
+  $('voice-start-listening').textContent = state.recognitionState === 'error' ? 'Try again' : 'Start dictation';
+  $('voice-start-listening').disabled = !available || !state.recognitionSupported || !state.canStart;
+  $('voice-stop-listening').hidden = !state.dictationEnabled && state.recognitionState !== 'stopping';
+  $('voice-stop-listening').disabled = !available || !state.dictationEnabled;
+  $('refresh-button').disabled = busy || state.dictationEnabled || state.recognitionState === 'stopping';
+  $('submit-answer').disabled = busy || needsRefresh || !session || session.status !== 'active'
+    || state.dictationEnabled || state.recognitionState === 'stopping' || !state.canStart;
 }
 function setBusy(value, title = '', message = '') {
   busy = value;
@@ -108,6 +153,7 @@ function setStep(step) {
 }
 function showPreparation() {
   if (busy) return;
+  leaveVoiceMode();
   clearError();
   $('preparation-screen').hidden = false;
   $('workspace-screen').hidden = true;
@@ -118,10 +164,19 @@ function showPreparation() {
 }
 
 function showAccessGate() {
+  leaveVoiceMode();
   $('demo-access-screen').hidden = false;
   $('preparation-screen').hidden = true;
   $('workspace-screen').hidden = true;
   $('demo-access-title').focus();
+}
+
+function leaveVoiceMode() {
+  voice.stopAll();
+  voice.setQuestion('');
+  voiceModeEnabled = false;
+  if ($('voice-controls')) $('voice-controls').hidden = true;
+  syncVoiceControls();
 }
 
 function showApplication() {
@@ -191,6 +246,7 @@ function renderSession(focusQuestion = false) {
   $('workspace-screen').hidden = false;
   const finished = session.status === 'finished';
   const decision = currentQuestionDecision(session);
+  voice.setQuestion(finished ? '' : session.current_question);
   const focus = typeof decision?.arguments.focus === 'string' ? decision.arguments.focus : '';
   $('session-role').textContent = session.target_role;
   $('session-id').textContent = session.id;
@@ -269,10 +325,11 @@ $('preparation-form').addEventListener('submit', async event => {
 
 $('answer-form').addEventListener('submit', async event => {
   event.preventDefault();
-  if (busy || needsRefresh || !session || session.status !== 'active') return;
+  if (busy || needsRefresh || voice.getState().listening || !session || session.status !== 'active') return;
   updateCounters();
   if (!$('answer-form').reportValidity()) return;
   clearError();
+  voice.stopSpeech();
   const before = session;
   const draft = $('answer-text').value;
   submittingAnswer = true;
@@ -383,8 +440,37 @@ $('demo-access-form').addEventListener('submit', async event => {
     $('demo-access-code').focus();
   } finally { setBusy(false); }
 });
+$('voice-mode-toggle').addEventListener('click', () => {
+  if (busy || !session || session.status !== 'active') return;
+  voiceModeEnabled = !voiceModeEnabled;
+  if (!voiceModeEnabled) {
+    voice.stopAll();
+    $('voice-status').textContent = 'Voice mode is off. Typing remains available.';
+  } else if (!voice.supportsSpeech() && !voice.supportsRecognition()) {
+    $('voice-status').textContent = 'Voice features are not supported in this browser. You can continue by typing.';
+  } else if (!voice.supportsRecognition()) {
+    $('voice-status').textContent = 'Speech recognition is not supported in this browser. You can listen to questions and type your answers.';
+  } else if (!voice.supportsSpeech()) {
+    $('voice-status').textContent = 'Spoken question playback is not supported in this browser. You can dictate or type your answer.';
+  } else {
+    $('voice-status').textContent = 'Voice mode is ready. Click Listen or Start dictation when you choose.';
+  }
+  syncVoiceControls();
+});
+$('voice-listen-button').addEventListener('click', () => {
+  if (!busy && voiceModeEnabled) voice.speakQuestion();
+});
+$('voice-replay-button').addEventListener('click', () => {
+  if (!busy && voiceModeEnabled) voice.replayQuestion();
+});
+$('voice-stop-speech-button').addEventListener('click', () => voice.stopSpeech(true));
+$('voice-start-listening').addEventListener('click', () => {
+  if (!busy && voiceModeEnabled) voice.startListening();
+});
+$('voice-stop-listening').addEventListener('click', () => voice.stopListening());
 $('demo-logout-button').addEventListener('click', async () => {
   if (busy || !accessRequired || !csrfToken) return;
+  leaveVoiceMode();
   clearError();
   setBusy(true, 'Signing out', 'Closing this judge access session.');
   try {
@@ -449,12 +535,13 @@ $('answer-text').addEventListener('keydown', event => {
 });
 // Warn only while an operation or unsaved answer could be lost; never log private input.
 window.addEventListener('beforeunload', event => {
+  voice.stopAll();
   persistDraft(needsRefresh || submittingAnswer);
   if (busy || $('answer-text').value.trim() || (!$('draft-backup').hidden && $('draft-backup-text').textContent.trim())) {
     event.preventDefault(); event.returnValue = '';
   }
 });
-window.addEventListener('pagehide', () => persistDraft(needsRefresh || submittingAnswer));
+window.addEventListener('pagehide', () => { voice.stopAll(); persistDraft(needsRefresh || submittingAnswer); });
 updateCounters();
 updateControls();
 initializeDemoAccess();

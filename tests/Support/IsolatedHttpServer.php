@@ -94,7 +94,7 @@ final class IsolatedHttpServer
         self::ensure(($method === 'GET' && (in_array($path, [
             '/', '/api/dev/status', '/api/demo/session', '/api/interviews/123e4567-e89b-42d3-a456-426614174000', '/app.html', '/assets/app.css', '/assets/app.mjs',
             '/.env', '/config/bootstrap.php', '/src/AI/GeminiClient.php', '/vendor/autoload.php', '/data/test.sqlite', '/.git/config',
-            '/assets/interview-api.mjs', '/assets/answer-draft.mjs', '/assets/cv-upload.mjs', '/assets/jobready.svg',
+            '/assets/interview-api.mjs', '/assets/answer-draft.mjs', '/assets/cv-upload.mjs', '/assets/voice-interview.mjs', '/assets/jobready.svg',
         ], true) || preg_match('#^/api/interviews/[a-f0-9-]{36}$#i', $path) === 1) && $body === null)
             || ($method === 'POST' && (in_array($path, ['/api/interviews', '/api/demo/login', '/api/demo/logout', '/api/cv/extract', '/api/interviews/123e4567-e89b-42d3-a456-426614174000/answers'], true)
                 || preg_match('#^/api/interviews/[a-f0-9-]{36}/answers$#i', $path) === 1)

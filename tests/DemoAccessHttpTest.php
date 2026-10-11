@@ -58,14 +58,14 @@ try {
     }
     accessHttpCheck($last['status'] === 429, 'Per-client interview creation cap was not applied.');
 
-    for ($attempt = 0; $attempt < 8; $attempt++) {
+    for ($attempt = 0; $attempt < 20; $attempt++) {
         $answerLimit = $server->request('POST', '/api/interviews/123e4567-e89b-42d3-a456-426614174000/answers',
             '{"answer":"fictional fixture answer"}', ['X-CSRF-Token' => $token]);
         accessHttpCheck($answerLimit['status'] === 404, 'Unknown interview should stop before any AI call; received HTTP ' . $answerLimit['status'] . '.');
     }
     $answerLimit = $server->request('POST', '/api/interviews/123e4567-e89b-42d3-a456-426614174000/answers',
         '{"answer":"fictional fixture answer"}', ['X-CSRF-Token' => $token]);
-    accessHttpCheck($answerLimit['status'] === 429, 'Per-session answer-turn cap was not applied.');
+    accessHttpCheck($answerLimit['status'] === 429, 'Per-client answer-turn cap was not applied at its unchanged limit.');
 
     for ($attempt = 0; $attempt < 3; $attempt++) {
         $firstUpload = $server->request('POST', '/api/cv/extract', '{}', ['X-CSRF-Token' => $token]);

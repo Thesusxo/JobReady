@@ -12,7 +12,7 @@ try {
         || !str_contains($page['body'], 'id="readiness-card"')) {
         throw new RuntimeException('Frontend HTML could not be served.');
     }
-    foreach (['/assets/app.css', '/assets/app.mjs', '/assets/interview-api.mjs', '/assets/answer-draft.mjs', '/assets/cv-upload.mjs', '/assets/jobready.svg'] as $asset) {
+    foreach (['/assets/app.css', '/assets/app.mjs', '/assets/interview-api.mjs', '/assets/answer-draft.mjs', '/assets/cv-upload.mjs', '/assets/voice-interview.mjs', '/assets/jobready.svg'] as $asset) {
         $response = $server->requestRaw('GET', $asset);
         if ($response['status'] !== 200 || $response['body'] === '') {
             throw new RuntimeException('Frontend asset could not be served.');
