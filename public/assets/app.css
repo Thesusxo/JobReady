@@ -44,8 +44,17 @@ h3 { font-size:14px; font-weight:650; }
 .breadcrumb > span { color:#a7afbd; margin:0 12px; }
 .breadcrumb strong { font-weight:500; color:var(--ink); }
 .product-pill { display:flex; align-items:center; white-space:nowrap; padding:6px 12px; border:1px solid #dce6e2; background:#f5faf7; border-radius:30px; color:#346451; font-size:11px; font-weight:500; }
+.topbar-actions { display:flex; align-items:center; gap:10px; }
 main { max-width:1290px; padding:42px clamp(24px,3.5vw,56px) 22px; margin:auto; outline:none; }
 .page-heading { margin-bottom:30px; }
+.access-screen { min-height:calc(100vh - 190px); display:grid; place-items:center; }
+.access-card { width:min(100%,540px); padding:clamp(25px,5vw,48px); }
+.access-card h1 { font-size:clamp(32px,5vw,44px); margin:10px 0 14px; }
+.access-card h1 span { color:var(--blue); }
+.access-card .report-symbol { margin-bottom:24px; }
+.access-card form { margin-top:27px; }
+.access-card .button { margin-top:14px; }
+.access-notice { border-top:1px solid var(--line); padding-top:17px; margin-top:25px; color:var(--muted); font-size:11px; }
 .eyebrow { font-size:10px; letter-spacing:1.65px; color:var(--blue); font-weight:700; margin-bottom:14px; }
 .eyebrow > span { font-size:14px; margin-right:7px; }
 .page-heading h1 span { color:var(--blue); }

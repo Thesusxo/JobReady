@@ -87,5 +87,12 @@ final class Database
                 created_at TEXT NOT NULL
             )
             SQL);
+        $pdo->exec(<<<'SQL'
+            CREATE TABLE IF NOT EXISTS demo_rate_limits (
+                bucket_hash TEXT PRIMARY KEY,
+                window_started INTEGER NOT NULL,
+                hit_count INTEGER NOT NULL
+            )
+            SQL);
     }
 }

@@ -1,12 +1,15 @@
 import {
-  ApiError, LIMITS, byteLength, createInterviewApi, currentQuestionDecision, readinessReport, sanitizeDiagnostics, sessionAdvanced, uuidPattern,
+  ApiError, LIMITS, byteLength, createDemoAccessApi, createInterviewApi, currentQuestionDecision, readinessReport, sanitizeDiagnostics, sessionAdvanced, uuidPattern,
 } from './interview-api.mjs';
 import { captureDraft, createDraftStore, recoverDraft } from './answer-draft.mjs';
 import { createCvUploadApi } from './cv-upload.mjs';
 
 const $ = id => document.getElementById(id);
-const api = createInterviewApi();
-const uploadApi = createCvUploadApi();
+let csrfToken = null;
+let accessRequired = false;
+const demoAccessApi = createDemoAccessApi();
+const api = createInterviewApi(globalThis.fetch, 90000, () => csrfToken);
+const uploadApi = createCvUploadApi(globalThis.fetch, 30000, () => csrfToken);
 const storageKey = 'jobready.session-id';
 const draftStore = createDraftStore();
 let session = null;
@@ -112,6 +115,41 @@ function showPreparation() {
   setStep('prepare');
   updateControls();
   $('preparation-title').focus();
+}
+
+function showAccessGate() {
+  $('demo-access-screen').hidden = false;
+  $('preparation-screen').hidden = true;
+  $('workspace-screen').hidden = true;
+  $('demo-access-title').focus();
+}
+
+function showApplication() {
+  $('demo-access-screen').hidden = true;
+  $('demo-logout-button').hidden = !accessRequired;
+  if (session) renderSession();
+  else {
+    $('preparation-screen').hidden = false;
+    $('workspace-screen').hidden = true;
+    const id = remembered();
+    if (id && uuidPattern.test(id)) {
+      $('resume-id').value = id;
+      loadSession(id, true);
+    }
+  }
+}
+
+async function initializeDemoAccess() {
+  try {
+    const result = await demoAccessApi.status();
+    accessRequired = result.access_required;
+    csrfToken = result.csrf_token;
+    if (result.authenticated) showApplication();
+    else showAccessGate();
+  } catch (error) {
+    showAccessGate();
+    showError(error);
+  }
 }
 
 function renderEvaluations() {
@@ -225,6 +263,7 @@ $('preparation-form').addEventListener('submit', async event => {
   } catch (error) {
     const ambiguous = error instanceof ApiError && ['network', 'timeout', 'response'].includes(error.kind);
     showError(error, ambiguous ? ' A session may have been created, but its ID was not received. Starting again would create a separate session.' : '');
+    if (error instanceof ApiError && error.status === 401 && accessRequired) showAccessGate();
   } finally { setBusy(false); }
 });
 
@@ -255,6 +294,7 @@ $('answer-form').addEventListener('submit', async event => {
     }
     persistDraft(needsRefresh);
     showError(error, needsRefresh ? ' Use Refresh progress to check the saved session before resubmitting.' : '');
+    if (error instanceof ApiError && error.status === 401 && accessRequired) showAccessGate();
   } finally { submittingAnswer = false; setBusy(false); }
 });
 
@@ -305,6 +345,7 @@ async function loadSession(id, restoring = false) {
   } catch (error) {
     if (restoring && error instanceof ApiError && error.status === 404) forget();
     showError(error);
+    if (error instanceof ApiError && error.status === 401 && accessRequired) showAccessGate();
   } finally { setBusy(false); }
 }
 $('refresh-button').addEventListener('click', () => { if (session) loadSession(session.id); });
@@ -314,6 +355,50 @@ $('resume-form').addEventListener('submit', event => {
   const id = $('resume-id').value.trim();
   if (!uuidPattern.test(id)) { showError(new ApiError('Enter a valid interview session ID.', 'validation')); return; }
   loadSession(id, true);
+});
+$('demo-access-form').addEventListener('submit', async event => {
+  event.preventDefault();
+  if (busy || !$('demo-access-form').reportValidity()) return;
+  clearError();
+  const code = $('demo-access-code').value;
+  setBusy(true, 'Checking your invitation', 'Verifying the judge access code securely.');
+  $('demo-access-code').value = '';
+  try {
+    const result = await demoAccessApi.login(code);
+    accessRequired = result.access_required;
+    csrfToken = result.csrf_token;
+    if (accessRequired && (!csrfToken || !/^[a-f0-9]{64}$/.test(csrfToken))) {
+      throw new ApiError('The secure demo session could not be established. Reload and try again.', 'access');
+    }
+    if (session) {
+      $('demo-access-screen').hidden = true;
+      await loadSession(session.id, true);
+    } else {
+      showApplication();
+      announce('Judge access granted. Prepare your fictional practice session.');
+    }
+  } catch (error) {
+    showAccessGate();
+    showError(error);
+    $('demo-access-code').focus();
+  } finally { setBusy(false); }
+});
+$('demo-logout-button').addEventListener('click', async () => {
+  if (busy || !accessRequired || !csrfToken) return;
+  clearError();
+  setBusy(true, 'Signing out', 'Closing this judge access session.');
+  try {
+    await demoAccessApi.logout(csrfToken);
+    csrfToken = null;
+    session = null;
+    failedSubmission = null;
+    needsRefresh = false;
+    draftStore.clear();
+    forget();
+    showAccessGate();
+    announce('Signed out of the JobReady judge preview.');
+  } catch (error) { showError(error); }
+  finally { setBusy(false); }
 });
 $('back-to-session').addEventListener('click', () => { if (!busy && session) { clearError(); renderSession(true); } });
 async function uploadCv(file) {
@@ -372,8 +457,4 @@ window.addEventListener('beforeunload', event => {
 window.addEventListener('pagehide', () => persistDraft(needsRefresh || submittingAnswer));
 updateCounters();
 updateControls();
-const savedId = remembered() || draftStore.read()?.session_id;
-if (savedId && uuidPattern.test(savedId)) {
-  $('resume-id').value = savedId;
-  loadSession(savedId, true);
-}
+initializeDemoAccess();

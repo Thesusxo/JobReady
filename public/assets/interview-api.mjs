@@ -142,14 +142,15 @@ function errorForStatus(status, diagnostics = {}) {
     ?? messages[status] ?? 'The request could not be completed. Your draft is still here.', 'http', status, safe);
 }
 
-export function createInterviewApi(fetchRequest = globalThis.fetch, timeoutMs = 90000) {
+export function createInterviewApi(fetchRequest = globalThis.fetch, timeoutMs = 90000, csrfToken = () => null) {
   async function request(path, method = 'GET', payload) {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), timeoutMs);
     try {
       const response = await fetchRequest(path, {
         method, signal: controller.signal, credentials: 'same-origin', cache: 'no-store', redirect: 'error',
-        headers: { Accept: 'application/json', ...(payload ? { 'Content-Type': 'application/json' } : {}) },
+        headers: { Accept: 'application/json', ...(payload ? { 'Content-Type': 'application/json' } : {}),
+          ...(payload && csrfToken() ? { 'X-CSRF-Token': csrfToken() } : {}) },
         ...(payload ? { body: JSON.stringify(payload) } : {}),
       });
       if (!response.ok) {
@@ -181,5 +182,48 @@ export function createInterviewApi(fetchRequest = globalThis.fetch, timeoutMs = 
     start: input => request('/api/interviews', 'POST', validatePreparation(input)),
     answer: (id, value) => request(`${sessionPath(id)}/answers`, 'POST', { answer: validateAnswer(value) }),
     progress: id => request(sessionPath(id)),
+  };
+}
+
+export function createDemoAccessApi(fetchRequest = globalThis.fetch) {
+  async function jsonRequest(path, method = 'GET', payload = null, csrfToken = null) {
+    let response;
+    try {
+      response = await fetchRequest(path, {
+        method, credentials: 'same-origin', cache: 'no-store', redirect: 'error',
+        headers: { Accept: 'application/json', ...(payload ? { 'Content-Type': 'application/json' } : {}),
+          ...(csrfToken ? { 'X-CSRF-Token': csrfToken } : {}) },
+        ...(payload ? { body: JSON.stringify(payload) } : {}),
+      });
+    } catch {
+      throw new ApiError('Could not connect to JobReady. Check the demo link and try again.', 'network');
+    }
+    let body;
+    try { body = await response.json(); }
+    catch { throw new ApiError('JobReady returned an unexpected response. Reload the page and try again.', 'response', response.status); }
+    if (!response.ok) {
+      const messages = {
+        401: 'That judge access code was not accepted.',
+        403: 'The secure judge session expired. Sign in again to continue.',
+        429: 'Too many sign-in attempts. Wait before trying again.',
+        503: 'Judge access is not configured on this server.',
+      };
+      throw new ApiError(messages[response.status] ?? 'Judge access could not be completed.', 'access', response.status);
+    }
+    if (path === '/api/demo/session' || method === 'POST' && path === '/api/demo/login') {
+      if (!record(body) || typeof body.access_required !== 'boolean' || typeof body.authenticated !== 'boolean'
+        || body.authenticated && body.access_required && !/^[a-f0-9]{64}$/.test(body.csrf_token ?? '')) {
+        throw new ApiError('The demo session response was invalid. Reload and try again.', 'access', response.status);
+      }
+      return { access_required: body.access_required, authenticated: body.authenticated,
+        csrf_token: body.authenticated ? body.csrf_token : null };
+    }
+    if (path === '/api/demo/logout' && record(body) && body.logged_out === true) return { logged_out: true };
+    throw new ApiError('The demo returned an unexpected response. Reload and try again.', 'access', response.status);
+  }
+  return {
+    status: () => jsonRequest('/api/demo/session'),
+    login: code => jsonRequest('/api/demo/login', 'POST', { access_code: code }),
+    logout: csrf => jsonRequest('/api/demo/logout', 'POST', {}, csrf),
   };
 }

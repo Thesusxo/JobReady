@@ -168,9 +168,16 @@ foreach (['plan', 'decision', 'claim_verification'] as $stage) {
 
 // Exercise the actual HTTP gate using blank keys: client fails before any external request.
 foreach ([['local', true, true], ['development', true, true], ['local', false, false], ['development', false, false], ['production', true, false], ['production', false, false], ['staging', true, false]] as [$env, $debug, $expose]) {
-    $server = new IsolatedHttpServer($env, $debug);
+    $gated = in_array($env, ['production', 'staging'], true);
+    $server = new IsolatedHttpServer($env, $debug, $gated ? password_hash('fixture-only-code', PASSWORD_DEFAULT) : '');
     try {
-        $response = $server->request('POST', '/api/interviews', IsolatedHttpServer::DIAGNOSTIC_REQUEST);
+        $headers = [];
+        if ($gated) {
+            $login = $server->request('POST', '/api/demo/login', '{"access_code":"fixture-only-code"}', ['CF-Visitor' => '{"scheme":"https"}']);
+            diagnosticCheck($login['status'] === 200, 'Production fixture judge login failed.');
+            $headers['X-CSRF-Token'] = $login['json']['csrf_token'];
+        }
+        $response = $server->request('POST', '/api/interviews', IsolatedHttpServer::DIAGNOSTIC_REQUEST, $headers);
         diagnosticCheck($response['status'] === 503, 'Keyless HTTP fixture did not return 503.');
         diagnosticCheck($response['json']['error'] === 'The interview service is temporarily unavailable.', 'Public error message changed.');
         diagnosticCheck(isset($response['json']['diagnostics']) === $expose, 'Actual HTTP diagnostic gate failed.');

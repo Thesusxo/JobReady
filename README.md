@@ -30,7 +30,7 @@ Hackathon development in progress.
 
 Requirements: PHP 8.2 with `PDO`, `pdo_sqlite`, `curl`, `fileinfo`, `dom`, `zip`, `zlib`, and `iconv` enabled. Confirm the modules with `php -m`. Document extraction also requires an available PHP CLI executable and `proc_open`.
 
-1. Copy `.env.example` to `.env` and adjust local settings as needed. The example contains placeholders only; credentials belong in `.env` and must not be committed.
+1. Copy `.env.example` to `.env` and adjust local settings as needed. The example contains placeholders only; credentials belong in `.env` and must not be committed. An empty `DEMO_ACCESS_CODE_HASH` preserves the local-only development workflow; the public demo must set it as described below.
 2. Install the locked, lightweight document-parser dependency:
 
    ```sh
@@ -63,7 +63,7 @@ Controls support keyboard navigation, visible focus, labeled inputs, status anno
 
 Choose or drop one **PDF or modern Word DOCX**, up to **5 MB (5,242,880 bytes)**, in the preparation screen. Paste-text input remains available. Extracted text fills the CV field for review/editing; it is not sent to Gemini until you explicitly start the interview. Failed extraction leaves existing pasted CV text unchanged. Scanned/image-only PDFs require OCR elsewhere or pasted text; this MVP does not run OCR. If extracted text exceeds the existing 20,000-byte interview CV limit, shorten it in the field before starting.
 
-`POST /api/cv/extract` accepts `multipart/form-data` with one `cv_file` and returns `{"text":"...", "format":"pdf"}` (or `docx`). Errors return a fixed `error` message and an allowlisted `code`. Extension, actual bytes/MIME, PHP upload errors, and actual size are checked. This endpoint bypasses private environment loading, interview storage, AI clients, and neatlogs.
+`POST /api/cv/extract` accepts `multipart/form-data` with one `cv_file` and returns `{"text":"...", "format":"pdf"}` (or `docx`). Errors return a fixed `error` message and an allowlisted `code`. Extension, actual bytes/MIME, PHP upload errors, and actual size are checked. It uses bootstrap for demo authentication/rate limits and SQLite rate-limit counters, but does not call AI/neatlogs or create an interview.
 
 PDFs use **smalot/pdfparser 2.12.5**, with its small Symfony mbstring polyfill dependency; versions are locked in `composer.lock`, and `/vendor/` remains Git-ignored. DOCX uses native PHP ZIP/DOM support. Extraction runs in a separate trusted PHP worker with a 96 MB memory limit, eight-second deadline, bounded output, external XML entity loading disabled, and URL/process-execution functions disabled. Uploaded data is parsed, never executed. PDF decompression and page counts are bounded; encrypted files are refused. DOCX packages are never unpacked to disk: unsafe paths, symlinks, encrypted entries, embedded objects/macros, excessive entry counts/sizes, high compression ratios, DTDs/entities, and malformed XML/packages are rejected. Readable output is capped at 64,000 bytes; overly complex documents receive a clear error.
 
@@ -87,6 +87,24 @@ Use `AI_PROVIDER=openai` with `OPENAI_API_KEY` and `OPENAI_MODEL` to select the 
 
 Gemini timeouts, quota/rate-limit errors, safety blocks, and malformed/truncated output fail safely. Failed interview turns roll back and leave the previous question available for retry; there are no automatic provider retries or fallbacks. The existing PHP action/tool validator still determines which decisions can execute. Merely loading bootstrap or the health endpoint makes no AI request; starting an interview or submitting an answer does.
 
+### Restricted hackathon judge access
+
+Before publishing a temporary tunnel, set `APP_ENV=production` and `APP_DEBUG=false`. The required demo-gate settings are `DEMO_ACCESS_CODE_HASH` and (for a Quick Tunnel whose connector reaches a loopback-bound PHP server) `APP_TRUSTED_PROXY_IPS=127.0.0.1,::1`. Keep the existing `AI_PROVIDER=gemini`, `GEMINI_API_KEY`, and `GEMINI_MODEL` configured; `APP_DB_PATH` must point to writable persistent storage (the default is `data/jobready.sqlite`). `NEATLOGS_WRITE_KEY` and `NEATLOGS_PROJECT` are optional for best-effort tracing. Set `DEMO_ACCESS_CODE_HASH` to a PHP `password_hash()` verifier; do not put the judge's plaintext access code in `.env`, a command argument, source, or browser code. Generate a verifier locally without placing the code in shell history:
+
+```sh
+php -r 'echo password_hash(trim(fgets(STDIN)), PASSWORD_DEFAULT), PHP_EOL;'
+```
+
+Type a random judge code into standard input, then place only the resulting verifier in private `.env` as `DEMO_ACCESS_CODE_HASH=...`. Share the code with judges through a separate private channel. A missing/invalid verifier fails closed in production. The login exchanges the code for a PHP session cookie (`HttpOnly`, `Secure`, `SameSite=Strict`) and a session-bound CSRF token. Interview, answer, retrieval, status, and upload API routes require the authenticated session; mutating routes also require the CSRF token. No judge code is returned to or persisted by the frontend.
+
+Required demo settings are `APP_ENV=production`, `APP_DEBUG=false`, `DEMO_ACCESS_CODE_HASH=<password_hash verifier>`, and (for a Cloudflare Quick Tunnel to a locally bound server) `APP_TRUSTED_PROXY_IPS=127.0.0.1,::1`. Keep the existing `AI_PROVIDER=gemini`, `GEMINI_API_KEY`, and `GEMINI_MODEL`; `NEATLOGS_WRITE_KEY` and `NEATLOGS_PROJECT` enable optional best-effort tracing. `APP_DB_PATH` may be left at its existing default or set to a private persistent path. Never put the plaintext judge code in `.env`; only its verifier belongs there. If using a different proxy, trust only its verified immediate peer IP. The app honors `CF-Visitor`/`CF-Connecting-IP` only when `REMOTE_ADDR` exactly matches this allowlist. Bind PHP/cloudflared to loopback, not a public interface. `/api/dev/status` remains unavailable in production.
+
+Server-enforced SQLite-backed fixed-window limits are deliberately conservative for a small demo: **2 interview starts per client IP per hour and 10 globally per day; 8 answers per interview per hour, 20 answers per client IP per hour, and 40 globally per day; 3 document extractions per client IP per hour and 20 globally per day; 10 failed/correct login attempts per IP per hour and 100 globally per hour.** A turn can cause several provider calls, so also set a low provider-side quota/budget. Rate-limit identities are stored as HMAC buckets rather than plaintext IPs/session IDs. An unauthenticated upload can consume ingress bandwidth/temp space before PHP applies app-level limits; keep the server bound to loopback and configure the tunnel or host edge with a request-body limit near 6 MB and an additional request rate cap. Keep SQLite on one persistent host and stop the demo tunnel/server after judging.
+
+Set `APP_TRUSTED_PROXY_IPS` only to the actual local connector addresses (the example loopback pair is for a tunnel to a server bound on loopback). If you do not use a reverse proxy, leave it empty; direct HTTPS is detected by PHP's `HTTPS` server variable. Do not trust arbitrary `X-Forwarded-*` values.
+
+The public preview is for **fictional candidate data only**. CV text and interview answers are stored in the SQLite database and sent to the selected AI provider when an interview starts or an answer is submitted. They are not encrypted by this application, and the MVP has no user accounts or deletion/retention workflow. Do not solicit real CVs or personal information. The document upload endpoint requires PHP's `proc_open` and CLI binary and is subject to the same authenticated session, CSRF protection, per-client/global limits, and 5 MB validation.
+
 #### Safe development diagnostics
 
 To diagnose an explicitly approved local AI test, set these non-secret values in your private `.env` yourself and restart the PHP server:
@@ -102,7 +120,7 @@ Failed AI requests can include an allowlisted `diagnostics` object containing `p
 
 Temporary runtime probe: `GET /api/dev/status` is available only with the same exact local/development and debug gate; otherwise it returns HTTP 404. It reports exactly `APP_ENV`, `debug_enabled`, `AI_PROVIDER`, `GEMINI_MODEL`, `diagnostics_enabled`, and `sqlite_driver_available`. Provider/model values use the effective configuration and defaults; malformed model names are reported as `null` rather than echoed. It exposes no keys, database paths, environment-file contents, or candidate data, and makes no AI or neatlogs requests. Inspect `http://127.0.0.1:8000/api/dev/status` before another approved live interview test.
 
-neatlogs uses the documented [`POST /v1/trace` HTTP ingest contract](https://docs.neatlogs.com/sdk/http-injection). Configure `NEATLOGS_WRITE_KEY` and `NEATLOGS_PROJECT` in `.env`; the key is read only by PHP and is never returned to the browser. When either value is absent, tracing is a no-op. Transport and HTTP failures are handled without interrupting JobReady, and error logs contain no token, payload, or response body.
+neatlogs uses the documented [`POST /v1/trace` HTTP ingest contract](https://docs.neatlogs.com/sdk/http-injection). Configure `NEATLOGS_WRITE_KEY` and `NEATLOGS_PROJECT` in `.env`; the key is read only by PHP and is never returned to the browser. Each successful or rolled-back interview turn is represented as a root workflow trace grouped with `neatlogs.session.id`, with nested spans for actual plan/decision/claim-verification model calls, output-validation guardrails, selected agent actions, persistence tasks, and transaction outcomes. Trace metadata is allowlisted, includes measured durations and the configured model when available, and omits prompts, document contents, answers, generated questions, provider output, and identifiers other than the opaque interview session ID. No `TOOL` span is emitted because the workflow does not invoke an external tool. Transport and HTTP failures are handled without interrupting JobReady, and error logs contain no token, payload, or response body. The local test submits exactly one minimal `jobready.integration_test` trace with no candidate data.
 
 ## Interview API (JSON)
 
@@ -116,8 +134,12 @@ Run all offline tests:
 
 ```sh
 php tests/InterviewWorkflowTest.php
+php tests/DemoAccessTest.php
+php tests/DemoAccessHttpTest.php
 php tests/GeminiClientTest.php
 php tests/GeminiDiagnosticsTest.php
+php tests/NeatlogsClientTest.php
+php tests/InterviewTracingTest.php
 php tests/DevStatusEndpointTest.php
 php tests/HealthEndpointTest.php
 php tests/InterviewConnectivityTest.php

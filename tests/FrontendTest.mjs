@@ -4,6 +4,7 @@ import { readFile } from 'node:fs/promises';
 import { File } from 'node:buffer';
 import {
   ApiError, byteLength, parseSession, currentQuestionDecision, readinessReport, sanitizeDiagnostics, sessionAdvanced, createInterviewApi,
+  createDemoAccessApi,
 } from '../public/assets/interview-api.mjs';
 import { captureDraft, createDraftStore, DRAFT_STORAGE_KEY, recoverDraft } from '../public/assets/answer-draft.mjs';
 
@@ -99,6 +100,28 @@ test('timeouts and connection errors preserve safe failure categories without re
   assert.equal(calls, 1);
   const network = createInterviewApi(async () => { throw new TypeError('PRIVATE_SENTINEL'); });
   await assert.rejects(network.progress(id), error => error.kind === 'network' && !error.message.includes('PRIVATE_SENTINEL'));
+});
+
+test('demo login uses same-origin JSON, validates the CSRF token, and does not retain the access code', async () => {
+  const requests = [];
+  const api = createDemoAccessApi(async (path, options) => {
+    requests.push([path, options]);
+    if (path === '/api/demo/session') return response({ access_required: true, authenticated: false, csrf_token: null });
+    if (path === '/api/demo/login') return response({ access_required: true, authenticated: true, csrf_token: 'a'.repeat(64) });
+    return response({ logged_out: true });
+  });
+  assert.deepEqual(await api.status(), { access_required: true, authenticated: false, csrf_token: null });
+  const loggedIn = await api.login('fictional-test-code');
+  assert.deepEqual(loggedIn, { access_required: true, authenticated: true, csrf_token: 'a'.repeat(64) });
+  assert.deepEqual(JSON.parse(requests[1][1].body), { access_code: 'fictional-test-code' });
+  assert.equal(requests[1][1].credentials, 'same-origin');
+  assert.equal(requests[1][1].headers['X-CSRF-Token'], undefined);
+  assert.deepEqual(await api.logout(loggedIn.csrf_token), { logged_out: true });
+  assert.equal(requests[2][1].headers['X-CSRF-Token'], 'a'.repeat(64));
+  const invalid = createDemoAccessApi(async () => response({ error: 'PRIVATE_SENTINEL' }, 401));
+  await assert.rejects(invalid.login('fictional-test-code'), error => error.status === 401 && !error.message.includes('PRIVATE_SENTINEL'));
+  const invalidToken = createDemoAccessApi(async () => response({ access_required: true, authenticated: true, csrf_token: 'PRIVATE_SENTINEL' }));
+  await assert.rejects(invalidToken.status(), /session response was invalid/);
 });
 
 test('error metadata is allowlisted and human messages never echo raw errors or sensitive data', async () => {
@@ -208,35 +231,54 @@ test('preparation, follow-up, refresh recovery, and completion UI work with a fa
   globalThis.window = { addEventListener() {} };
   globalThis.sessionStorage = { getItem: key => stored.get(key) ?? null, setItem: (key, value) => stored.set(key, value), removeItem: key => stored.delete(key) };
   const requests = [];
-  const queue = [response({ error: 'PRIVATE_SENTINEL', code: 'encrypted' }, 422),
+  const csrf = 'a'.repeat(64);
+  const queue = [response({ access_required: true, authenticated: false, csrf_token: null }),
+    response({ access_required: true, authenticated: true, csrf_token: csrf }),
+    response({ error: 'PRIVATE_SENTINEL', code: 'encrypted' }, 422),
     response({ text: preparation.cv_text, format: 'docx' }), response(initial(), 201), response({ error: 'PRIVATE_SENTINEL', diagnostics: {
     provider: 'gemini', category: 'quota_or_rate_limit', stage: 'decision', upstream_http_status: 429, raw: 'PRIVATE_SENTINEL',
-  } }, 503), response(initial()), response(initial()), response(followedUp()), new Error('PRIVATE_SENTINEL'), response(finished())];
+  } }, 503), response({ access_required: true, authenticated: true, csrf_token: csrf }),
+  response(initial()), response(initial()), response(followedUp()), new Error('PRIVATE_SENTINEL'), response(finished())];
   globalThis.fetch = async (path, options) => {
-    requests.push([path, options.method]);
+    requests.push([path, options.method, options]);
     const item = queue.shift();
     if (item instanceof Error) throw item;
     assert.ok(item, 'Unexpected automatic request.');
     return item;
   };
   await import('../public/assets/app.mjs');
-  assert.equal(requests.length, 0, 'Fresh page must not create an interview automatically.');
+  await new Promise(resolve => setTimeout(resolve, 0));
+  assert.deepEqual(requests[0].slice(0, 2), ['/api/demo/session', 'GET'], 'App must check whether the judge gate is enabled before showing preparation.');
+  assert.equal(requests.length, 1, 'Fresh page must not create an interview automatically.');
+  assert.equal(nodes.get('demo-access-screen').hidden, false);
+  assert.equal(nodes.get('preparation-screen').hidden, true);
+  nodes.get('demo-access-code').value = 'fictional-browser-judge-code';
+  await nodes.get('demo-access-form').fire('submit');
+  assert.equal(JSON.parse(requests[1][2].body).access_code, 'fictional-browser-judge-code');
+  assert.equal(nodes.get('demo-access-code').value, '', 'Browser must clear the access code after sending it.');
+  assert.equal(stored.has('jobready.demo-access-code'), false, 'Browser must not persist the judge access code.');
+  assert.equal(nodes.get('demo-access-screen').hidden, true);
+  assert.equal(nodes.get('demo-logout-button').hidden, false);
+  assert.equal(requests[1][2].headers['X-CSRF-Token'], undefined);
   nodes.get('target-role').value = preparation.target_role;
   nodes.get('cv-text').value = preparation.cv_text;
   nodes.get('job-description').value = preparation.job_description;
   nodes.get('cv-file').files = [new File(['fictional fixture bytes'], 'fictional.docx')];
   await nodes.get('cv-file').fire('change');
   assert.equal(nodes.get('cv-text').value, preparation.cv_text, 'Failed extraction must preserve pasted CV text.');
-  assert.equal(requests[0][0], '/api/cv/extract');
+  assert.equal(requests[2][0], '/api/cv/extract');
+  assert.equal(requests[2][2].headers['X-CSRF-Token'], csrf);
   assert.match(nodes.get('error-message').textContent, /encrypted/);
   await nodes.get('cv-file').fire('change');
   assert.equal(nodes.get('cv-text').value, preparation.cv_text);
-  assert.equal(requests[1][0], '/api/cv/extract');
-  assert.equal(requests.length, 2, 'Uploading must not start an interview or call its API automatically.');
+  assert.equal(requests[3][0], '/api/cv/extract');
+  assert.equal(requests[3][2].headers['X-CSRF-Token'], csrf);
+  assert.equal(requests.length, 4, 'Uploading must not start an interview or call its API automatically.');
   const starting = nodes.get('preparation-form').fire('submit');
   assert.equal(nodes.get('start-button').disabled, true, 'Start must be disabled while the request is in flight.');
   await nodes.get('preparation-form').fire('submit');
   await starting;
+  assert.equal(requests[4][2].headers['X-CSRF-Token'], csrf);
   assert.equal(nodes.get('question-text').textContent, initial().current_question);
   assert.equal(nodes.get('workspace-screen').hidden, false);
   assert.equal(nodes.get('cv-text').value, '');
@@ -246,6 +288,7 @@ test('preparation, follow-up, refresh recovery, and completion UI work with a fa
   await nodes.get('answer-text').fire('input');
   assert.equal(JSON.parse(stored.get(DRAFT_STORAGE_KEY)).text, 'I checked some code.');
   await nodes.get('answer-form').fire('submit');
+  assert.equal(requests[5][2].headers['X-CSRF-Token'], csrf);
   assert.equal(nodes.get('answer-text').value, 'I checked some code.');
   assert.equal(nodes.get('submit-answer').disabled, true, 'A failed POST must require progress reconciliation.');
   assert.equal(nodes.get('error-details').hidden, false);
@@ -254,7 +297,7 @@ test('preparation, follow-up, refresh recovery, and completion UI work with a fa
   assert.equal(nodes.get('diagnostic-status').textContent, '429');
   assert.ok(!nodes.get('error-message').textContent.includes('PRIVATE_SENTINEL'));
   await nodes.get('answer-form').fire('submit');
-  assert.equal(requests.length, 4, 'No automatic retry or duplicate POST is allowed.');
+  assert.equal(requests.length, 6, 'No automatic retry or duplicate POST is allowed.');
   // Simulate page reload: new document and controller, same tab storage. Only GET recovery is allowed.
   resetDocument();
   await import('../public/assets/app.mjs?draft-reload-fixture');
@@ -263,7 +306,7 @@ test('preparation, follow-up, refresh recovery, and completion UI work with a fa
   assert.equal(nodes.get('submit-answer').disabled, true, 'Reload of a failed/pending POST must require explicit refresh.');
   assert.equal(requests.at(-1)[1], 'GET');
   await nodes.get('answer-form').fire('submit');
-  assert.equal(requests.length, 5, 'Recovered drafts must never be auto-submitted.');
+  assert.equal(requests.length, 8, `Recovered drafts must never be auto-submitted: ${JSON.stringify(requests.map(([path, method]) => [path, method]))}`);
   // Let the explicit progress GET finish before testing resubmission.
   nodes.get('refresh-button').listeners.get('click')();
   await new Promise(resolve => setTimeout(resolve, 0));
@@ -298,7 +341,7 @@ test('preparation, follow-up, refresh recovery, and completion UI work with a fa
   assert.equal(nodes.get('draft-backup-text').textContent, editedDraft);
   assert.equal(nodes.get('evaluation-empty').hidden, true);
   assert.equal(nodes.get('evaluation-list').childElementCount, 1);
-  assert.deepEqual(requests.map(item => item[1]), ['POST', 'POST', 'POST', 'POST', 'GET', 'GET', 'POST', 'POST', 'GET']);
+  assert.deepEqual(requests.map(item => item[1]), ['GET', 'POST', 'POST', 'POST', 'POST', 'POST', 'GET', 'GET', 'GET', 'POST', 'POST', 'GET']);
   assert.equal(queue.length, 0);
   assert.ok(!nodes.get('error-message').textContent.includes('PRIVATE_SENTINEL'));
   assert.equal(stored.get('jobready.session-id'), id, 'Recovery must preserve the original session.');

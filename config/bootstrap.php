@@ -9,6 +9,7 @@ use JobReady\Interview\InterviewService;
 use JobReady\Observability\NeatlogsClientInterface;
 use JobReady\Observability\NeatlogsClient;
 use JobReady\Observability\NullNeatlogsClient;
+use JobReady\Security\DemoAccess;
 use JobReady\Storage\Database;
 use JobReady\Storage\InterviewStore;
 use JobReady\Storage\SessionStore;
@@ -25,6 +26,15 @@ if (!str_starts_with($databasePath, DIRECTORY_SEPARATOR) && !preg_match('/^[A-Za
 }
 
 $pdo = Database::connect($databasePath);
+$environment = Environment::get('APP_ENV', 'production') ?? 'production';
+$demoAccessHash = Environment::get('DEMO_ACCESS_CODE_HASH');
+$trustedProxyIps = Environment::get('APP_TRUSTED_PROXY_IPS', '') ?? '';
+$demoAccess = new JobReady\Security\DemoAccess(
+    $pdo,
+    $environment,
+    $demoAccessHash,
+    $trustedProxyIps,
+);
 $sessionStore = new SessionStore($pdo);
 $interviewStore = new InterviewStore($pdo);
 $writeKey = Environment::get('NEATLOGS_WRITE_KEY');
@@ -49,10 +59,11 @@ $openAI = match ($provider) {
 $interviewService = new InterviewService($pdo, $interviewStore, $openAI, new DecisionValidator(), $neatlogsClient);
 
 return [
-    'environment' => Environment::get('APP_ENV', 'production'),
+    'environment' => $environment,
     'debug' => Environment::get('APP_DEBUG', 'false') === 'true',
     'ai_provider' => $provider,
     'gemini_model' => $geminiModel,
+    'demo_access' => $demoAccess,
     'pdo' => $pdo,
     'session_store' => $sessionStore,
     'interview_store' => $interviewStore,

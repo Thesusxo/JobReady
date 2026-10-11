@@ -21,7 +21,7 @@ export function validateCvFile(file) {
   if (file.size <= 0) throw new ApiError(messages.malformed, 'upload');
 }
 
-export function createCvUploadApi(fetchRequest = globalThis.fetch, timeoutMs = 30000) {
+export function createCvUploadApi(fetchRequest = globalThis.fetch, timeoutMs = 30000, csrfToken = () => null) {
   return {
     async extract(file) {
       validateCvFile(file);
@@ -32,7 +32,7 @@ export function createCvUploadApi(fetchRequest = globalThis.fetch, timeoutMs = 3
         form.append('cv_file', file);
         const response = await fetchRequest('/api/cv/extract', {
           method: 'POST', body: form, signal: controller.signal, credentials: 'same-origin',
-          redirect: 'error', cache: 'no-store', headers: { Accept: 'application/json' },
+          redirect: 'error', cache: 'no-store', headers: { Accept: 'application/json', ...(csrfToken() ? { 'X-CSRF-Token': csrfToken() } : {}) },
         });
         let body;
         try { body = await response.json(); } catch { throw new ApiError(messages.malformed, 'upload', response.status); }

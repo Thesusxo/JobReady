@@ -5,7 +5,7 @@ namespace JobReady\AI;
 
 use Throwable;
 
-final class OpenAIClient implements OpenAIClientInterface
+final class OpenAIClient implements OpenAIClientInterface, AIModelMetadataInterface
 {
     private const ENDPOINT = 'https://api.openai.com/v1/chat/completions';
 
@@ -13,6 +13,11 @@ final class OpenAIClient implements OpenAIClientInterface
         private readonly ?string $apiKey,
         private readonly string $model = 'gpt-4o-mini',
     ) {
+    }
+
+    public function modelName(): string
+    {
+        return $this->model;
     }
 
     public function createPlan(array $candidate): array

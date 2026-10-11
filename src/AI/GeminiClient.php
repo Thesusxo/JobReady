@@ -8,7 +8,7 @@ use JsonException;
 use stdClass;
 use Throwable;
 
-final class GeminiClient implements InterviewAIClientInterface
+final class GeminiClient implements InterviewAIClientInterface, AIModelMetadataInterface
 {
     public const DEFAULT_MODEL = 'gemini-3.1-flash-lite';
     private const MAX_RESPONSE_BYTES = 65536;
@@ -22,6 +22,11 @@ final class GeminiClient implements InterviewAIClientInterface
         private readonly string $model = self::DEFAULT_MODEL,
         private readonly ?Closure $transport = null,
     ) {
+    }
+
+    public function modelName(): string
+    {
+        return $this->model;
     }
 
     public function createPlan(array $candidate): array

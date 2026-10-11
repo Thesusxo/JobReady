@@ -31,7 +31,7 @@
     <div class="main-column">
       <header class="topbar">
         <span class="breadcrumb">Your career, in progress <span aria-hidden="true">/</span> <strong id="page-location">Interview preparation</strong></span>
-        <span class="product-pill"><span class="tiny-dot" aria-hidden="true"></span> Adaptive AI coach</span>
+        <div class="topbar-actions"><span class="product-pill"><span class="tiny-dot" aria-hidden="true"></span> Adaptive AI coach</span><button id="demo-logout-button" class="button secondary compact" type="button" hidden>Sign out</button></div>
       </header>
       <main id="main" tabindex="-1">
         <noscript><div class="notice error">JavaScript is required for the interview workspace. Enable it and reload this page.</div></noscript>
@@ -39,7 +39,11 @@
         <div id="loading-notice" class="notice loading" role="status" hidden><span class="spinner" aria-hidden="true"></span><div><strong id="loading-title">Getting your session ready</strong><p id="loading-message">Your coach is reviewing the details.</p></div></div>
         <p id="announcement" class="sr-only" role="status" aria-live="polite" aria-atomic="true"></p>
 
-        <section id="preparation-screen" aria-labelledby="preparation-title">
+        <section id="demo-access-screen" class="access-screen" aria-labelledby="demo-access-title" hidden>
+          <div class="access-card card"><span class="report-symbol" aria-hidden="true">✦</span><p class="eyebrow">NEATHACK JUDGE PREVIEW</p><h1 id="demo-access-title">A private room<br><span>for your next big idea.</span></h1><p class="lead">Enter the access code shared by the JobReady team to begin your fictional practice interview.</p><form id="demo-access-form" method="post"><label for="demo-access-code">Judge access code</label><input id="demo-access-code" type="password" required maxlength="256" autocomplete="current-password" placeholder="Enter your invitation code"><button id="demo-access-button" class="button primary full-width" type="submit" disabled><span>Enter JobReady</span><span aria-hidden="true">→</span></button></form><p class="access-notice">For this hackathon preview, use fictional candidate information only. Do not upload a real CV or other personal data.</p></div>
+        </section>
+
+        <section id="preparation-screen" aria-labelledby="preparation-title" hidden>
           <div class="page-heading"><p class="eyebrow"><span aria-hidden="true">✦</span> PREPARE WITH PURPOSE</p><h1 id="preparation-title" tabindex="-1">Your next interview.<br><span>A more confident you.</span></h1><p class="lead">Bring your experience. We’ll bring the right questions.<br>A practice session shaped around you and the role you want.</p></div>
           <div class="preparation-grid">
             <section class="card preparation-card" aria-labelledby="profile-title">

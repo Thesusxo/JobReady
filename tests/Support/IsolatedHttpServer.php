@@ -9,8 +9,10 @@ final class IsolatedHttpServer
     private string $fixture;
     private string $address;
     private $process = null;
+    private ?string $sessionCookie = null;
+    public ?string $lastSetCookie = null;
 
-    public function __construct(string $environmentName = 'local', bool $debug = false)
+    public function __construct(string $environmentName = 'local', bool $debug = false, string $demoAccessHash = '', string $trustedProxyIps = '127.0.0.1,::1')
     {
         $this->fixture = sys_get_temp_dir() . '/jobready-http-' . bin2hex(random_bytes(8));
         try {
@@ -24,7 +26,8 @@ final class IsolatedHttpServer
                 self::copyFixture(dirname(__DIR__, 2) . '/vendor', $this->fixture . '/vendor');
             }
             self::ensure(mkdir($this->fixture . '/uploads', 0700), 'fixture_upload_directory');
-            self::ensure(file_put_contents($this->fixture . '/.env', 'APP_ENV=' . $environmentName . "\nAPP_DEBUG=" . ($debug ? 'true' : 'false') . "\nAPP_DB_PATH=data/test.sqlite\nAI_PROVIDER=gemini\nGEMINI_API_KEY=\nOPENAI_API_KEY=\nNEATLOGS_WRITE_KEY=\nNEATLOGS_PROJECT=\n") !== false, 'fixture_environment');
+            self::ensure(mkdir($this->fixture . '/sessions', 0700), 'fixture_session_directory');
+            self::ensure(file_put_contents($this->fixture . '/.env', 'APP_ENV=' . $environmentName . "\nAPP_DEBUG=" . ($debug ? 'true' : 'false') . "\nAPP_DB_PATH=data/test.sqlite\nDEMO_ACCESS_CODE_HASH=" . $demoAccessHash . "\nAPP_TRUSTED_PROXY_IPS=" . $trustedProxyIps . "\nAI_PROVIDER=gemini\nGEMINI_API_KEY=\nOPENAI_API_KEY=\nNEATLOGS_WRITE_KEY=\nNEATLOGS_PROJECT=\n") !== false, 'fixture_environment');
 
             $reservation = @stream_socket_server('tcp://127.0.0.1:0', $error, $message);
             self::ensure($reservation !== false, 'port_reservation');
@@ -43,8 +46,8 @@ final class IsolatedHttpServer
             }
             $null = PHP_OS_FAMILY === 'Windows' ? 'NUL' : '/dev/null';
             $this->process = proc_open(
-                [PHP_BINARY, '-d', 'display_errors=0', '-d', 'upload_max_filesize=5M', '-d', 'post_max_size=6M',
-                    '-d', 'upload_tmp_dir=' . $this->fixture . '/uploads', '-S', $address, '-t', $this->fixture . '/public'],
+                [PHP_BINARY, '-d', 'display_errors=0', '-d', 'session.save_path=' . $this->fixture . '/sessions', '-d', 'upload_max_filesize=5M', '-d', 'post_max_size=6M',
+                    '-d', 'upload_tmp_dir=' . $this->fixture . '/uploads', '-d', 'error_log=' . $this->fixture . '/server-error.log', '-S', $address, '-t', $this->fixture . '/public'],
                 [0 => ['file', $null, 'r'], 1 => ['file', $null, 'a'], 2 => ['file', $null, 'a']],
                 $pipes,
                 $this->fixture,
@@ -71,9 +74,9 @@ final class IsolatedHttpServer
     }
 
     /** @return array{status: int, json: array<string, mixed>} */
-    public function request(string $method, string $path, ?string $body = null): array
+    public function request(string $method, string $path, ?string $body = null, array $headers = []): array
     {
-        $response = $this->requestRaw($method, $path, $body);
+        $response = $this->requestRaw($method, $path, $body, $headers);
         self::ensure(str_starts_with(strtolower($response['content_type']), 'application/json'), 'response_content_type');
         try {
             $json = json_decode($response['body'], true, 16, JSON_THROW_ON_ERROR);
@@ -85,14 +88,17 @@ final class IsolatedHttpServer
     }
 
     /** @return array{status: int, content_type: string, body: string} */
-    public function requestRaw(string $method, string $path, ?string $body = null): array
+    public function requestRaw(string $method, string $path, ?string $body = null, array $headers = []): array
     {
         // Every creation probe is invalid or keyless; no provider call can be authenticated.
-        self::ensure(($method === 'GET' && in_array($path, [
-            '/', '/api/dev/status', '/app.html', '/assets/app.css', '/assets/app.mjs',
+        self::ensure(($method === 'GET' && (in_array($path, [
+            '/', '/api/dev/status', '/api/demo/session', '/api/interviews/123e4567-e89b-42d3-a456-426614174000', '/app.html', '/assets/app.css', '/assets/app.mjs',
+            '/.env', '/config/bootstrap.php', '/src/AI/GeminiClient.php', '/vendor/autoload.php', '/data/test.sqlite', '/.git/config',
             '/assets/interview-api.mjs', '/assets/answer-draft.mjs', '/assets/cv-upload.mjs', '/assets/jobready.svg',
-        ], true) && $body === null)
-            || ($method === 'POST' && $path === '/api/interviews' && in_array($body, ['{}', '{', self::DIAGNOSTIC_REQUEST], true)), 'request_allowlist');
+        ], true) || preg_match('#^/api/interviews/[a-f0-9-]{36}$#i', $path) === 1) && $body === null)
+            || ($method === 'POST' && (in_array($path, ['/api/interviews', '/api/demo/login', '/api/demo/logout', '/api/cv/extract', '/api/interviews/123e4567-e89b-42d3-a456-426614174000/answers'], true)
+                || preg_match('#^/api/interviews/[a-f0-9-]{36}/answers$#i', $path) === 1)
+                && in_array($body, ['{}', '{', self::DIAGNOSTIC_REQUEST, '{"access_code":"fixture-only-code"}', '{"access_code":"wrong-fixture-code"}', '{"answer":"fictional fixture answer"}'], true)), 'request_allowlist');
         $curl = curl_init('http://' . $this->address . $path);
         self::ensure($curl !== false, 'http_initialization');
         try {
@@ -103,10 +109,25 @@ final class IsolatedHttpServer
                 CURLOPT_FOLLOWLOCATION => false,
                 CURLOPT_CONNECTTIMEOUT => 2,
                 CURLOPT_TIMEOUT => 5,
+                CURLOPT_HEADERFUNCTION => function ($curl, string $line): int {
+                    if (stripos($line, 'Set-Cookie: JOBREADY_DEMO=') === 0) {
+                        $this->lastSetCookie = trim(substr($line, strlen('Set-Cookie: ')));
+                        $this->sessionCookie = explode(';', $this->lastSetCookie, 2)[0];
+                    }
+                    return strlen($line);
+                },
             ];
+            if ($headers !== []) {
+                $options[CURLOPT_HTTPHEADER] = [];
+                foreach ($headers as $name => $value) $options[CURLOPT_HTTPHEADER][] = $name . ': ' . $value;
+            }
+            if ($this->sessionCookie !== null) $options[CURLOPT_COOKIE] = $this->sessionCookie;
             if ($body !== null) {
                 $options[CURLOPT_POSTFIELDS] = $body;
-                $options[CURLOPT_HTTPHEADER] = ['Content-Type: application/json'];
+                if (!isset($options[CURLOPT_HTTPHEADER])) $options[CURLOPT_HTTPHEADER] = [];
+                $hasContentType = false;
+                foreach ($headers as $name => $_value) if (strcasecmp((string) $name, 'Content-Type') === 0) $hasContentType = true;
+                if (!$hasContentType) $options[CURLOPT_HTTPHEADER][] = 'Content-Type: application/json';
             }
             curl_setopt_array($curl, $options);
             $response = curl_exec($curl);
@@ -117,6 +138,30 @@ final class IsolatedHttpServer
             curl_close($curl);
         }
         return ['status' => $status, 'content_type' => is_string($type) ? $type : '', 'body' => $response];
+    }
+
+    public function fixtureRoot(): string
+    {
+        return $this->fixture;
+    }
+
+    public function fixtureSessionFileCount(): int
+    {
+        $count = 0;
+        foreach (new DirectoryIterator($this->fixture . '/sessions') as $entry) {
+            if (!$entry->isDot() && $entry->isFile()) $count++;
+        }
+        return $count;
+    }
+
+    public function fixtureSessionsContain(string $needle): bool
+    {
+        foreach (new DirectoryIterator($this->fixture . '/sessions') as $entry) {
+            if ($entry->isDot() || !$entry->isFile()) continue;
+            $contents = file_get_contents($entry->getPathname());
+            if (is_string($contents) && str_contains($contents, $needle)) return true;
+        }
+        return false;
     }
 
     public function stop(): void
@@ -130,15 +175,16 @@ final class IsolatedHttpServer
     }
 
     /** Sends only a generated fictional document to the isolated extraction endpoint. */
-    public function upload(string $filename, string $contents, string $clientMime = 'application/octet-stream'): array
+    public function upload(string $filename, string $contents, string $clientMime = 'application/octet-stream', ?string $testClientIp = null): array
     {
         $path = $this->fixture . '/fixture-document';
         self::ensure(file_put_contents($path, $contents) !== false, 'fixture_document');
         $curl = curl_init('http://' . $this->address . '/api/cv/extract');
         try {
+            $headers = $testClientIp === null ? [] : ['CF-Connecting-IP: ' . $testClientIp];
             curl_setopt_array($curl, [CURLOPT_POST => true,
                 CURLOPT_POSTFIELDS => ['cv_file' => new CURLFile($path, $clientMime, $filename)],
-                CURLOPT_RETURNTRANSFER => true, CURLOPT_PROXY => '', CURLOPT_TIMEOUT => 20, CURLOPT_FOLLOWLOCATION => false]);
+                CURLOPT_HTTPHEADER => $headers, CURLOPT_RETURNTRANSFER => true, CURLOPT_PROXY => '', CURLOPT_TIMEOUT => 20, CURLOPT_FOLLOWLOCATION => false]);
             $body = curl_exec($curl);
             $status = (int) curl_getinfo($curl, CURLINFO_HTTP_CODE);
             self::ensure(is_string($body) && curl_errno($curl) === 0, 'upload_http_transport');
