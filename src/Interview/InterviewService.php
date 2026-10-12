@@ -34,23 +34,33 @@ final class InterviewService
         $traceStarted = hrtime(true);
         $traceChildren = [];
         $id = $this->uuid();
-        $planStarted = hrtime(true);
-        try {
-            $rawPlan = $this->openAI->createPlan($candidate);
-        } catch (AIUnavailableException $exception) {
-            $traceChildren[] = $this->llmSpan('generate_interview_plan', 'ERROR', $planStarted, 'provider_call_failed');
-            $this->emitTrace('jobready.interview.started', $id, $traceChildren, 'ERROR', $traceStarted, 'provider_call_failed');
-            throw new HttpException(503, 'The interview service is temporarily unavailable.', $exception->withStage('plan')->diagnostics);
-        }
-        $traceChildren[] = $this->llmSpan('generate_interview_plan', 'OK', $planStarted);
-        $validationStarted = hrtime(true);
-        try {
-            $plan = $this->validator->validatePlan($rawPlan);
-            $traceChildren[] = $this->guardrailSpan('validate_interview_plan', $validationStarted, true);
-        } catch (HttpException $exception) {
-            $traceChildren[] = $this->guardrailSpan('validate_interview_plan', $validationStarted, false, 'invalid_output');
-            $this->emitTrace('jobready.interview.started', $id, $traceChildren, 'ERROR', $traceStarted, 'invalid_output');
-            throw $this->invalidOutput($exception, 'plan', 'INVALID_PLAN');
+        // One retry only for a decoded plan rejected by the guardrail, before any DB transaction.
+        // Transport/quota/authentication/JSON parsing failures are never automatically retried.
+        for ($attempt = 1; $attempt <= 2; $attempt++) {
+            $planStarted = hrtime(true);
+            try {
+                $rawPlan = $this->openAI->createPlan($candidate);
+            } catch (AIUnavailableException $exception) {
+                $traceChildren[] = $this->llmSpan('generate_interview_plan', 'ERROR', $planStarted, 'provider_call_failed');
+                $this->emitTrace('jobready.interview.started', $id, $traceChildren, 'ERROR', $traceStarted, 'provider_call_failed');
+                throw new HttpException(503, 'The interview service is temporarily unavailable.', $exception->withStage('plan')->diagnostics);
+            }
+            $traceChildren[] = $this->llmSpan('generate_interview_plan', 'OK', $planStarted);
+            $validationStarted = hrtime(true);
+            try {
+                $plan = $this->validator->validatePlan($rawPlan);
+                $traceChildren[] = $this->guardrailSpan('validate_interview_plan', $validationStarted, true);
+                break;
+            } catch (HttpException $exception) {
+                $traceChildren[] = $this->guardrailSpan('validate_interview_plan', $validationStarted, false, 'invalid_output');
+                // diagnostics are fixed-label allowlisted by HttpException; never log model data.
+                $reason = $exception->diagnostics['reason'] ?? 'INVALID_PLAN';
+                error_log('JobReady plan validation failed (requirement=' . $reason . ', attempt=' . $attempt . ').');
+                if ($attempt === 2) {
+                    $this->emitTrace('jobready.interview.started', $id, $traceChildren, 'ERROR', $traceStarted, 'invalid_output');
+                    throw $this->invalidOutput($exception, 'plan', 'INVALID_PLAN');
+                }
+            }
         }
 
         $beginStarted = hrtime(true);
@@ -179,7 +189,7 @@ final class InterviewService
             $agentChildren[] = $this->llmSpan('decide_next_interview_action', 'OK', $decisionStarted);
             $validationStarted = hrtime(true);
             try {
-                $decision = $this->validator->validateDecision($rawDecision, $allowedActions, $latestAnswer);
+                $decision = $this->validator->validateDecision($rawDecision, $allowedActions, $latestAnswer, $context);
             } catch (HttpException $exception) {
                 $agentChildren[] = $this->guardrailSpan('validate_agent_decision', $validationStarted, false, 'invalid_output');
                 $traceChildren[] = $this->agentSpan('decide_interview_turn', $agentStarted, $agentChildren, 'ERROR', 'invalid_output');
@@ -258,7 +268,9 @@ final class InterviewService
     /** @param array<string, mixed> $interview @param list<string> $allowedActions @return array<string, mixed> */
     private function buildContext(array $interview, array $allowedActions): array
     {
-        $answers = array_slice($this->store->getAnswers($interview['id']), -8);
+        // The final report needs all saved evidence, including legacy interviews over the new cap.
+        $answers = $this->store->getAnswers($interview['id']);
+        if ($allowedActions !== ['finish_interview']) $answers = array_slice($answers, -8);
         $evaluations = array_slice($this->store->getEvaluations($interview['id']), -12);
         $decisions = array_slice($this->store->getDecisions($interview['id']), -12);
         return [
@@ -388,7 +400,7 @@ final class InterviewService
     private function invalidOutput(HttpException $exception, string $stage, string $reason): HttpException
     {
         return new HttpException($exception->status, $exception->getMessage(), [
-            'category' => 'invalid_output', 'stage' => $stage, 'reason' => $reason,
+            'category' => 'invalid_output', 'stage' => $stage, 'reason' => $exception->diagnostics['reason'] ?? $reason,
         ]);
     }
 

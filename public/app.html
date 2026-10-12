@@ -46,7 +46,7 @@
         </section>
 
         <section id="preparation-screen" aria-labelledby="preparation-title" hidden>
-          <div class="page-heading"><p class="eyebrow">PREPARE WITH PURPOSE</p><h1 id="preparation-title" tabindex="-1">Your next interview.<br><span>A more confident you.</span></h1><p class="lead">Bring your experience. We’ll bring the right questions.<br>A practice session shaped around you and the role you want.</p></div>
+          <div class="page-heading"><p class="eyebrow">PREPARE WITH PURPOSE</p><h1 id="preparation-title" tabindex="-1">Your next interview.<br><span>A more confident you.</span></h1><p class="lead">Bring your experience. We’ll bring the right questions.<br>Up to 10 answers, with relevant follow-ups and an earlier finish when there’s enough evidence.</p></div>
           <div class="preparation-grid">
             <section class="card preparation-card" aria-labelledby="profile-title">
               <div class="card-heading"><div><span class="overline">LET’S MAKE IT PERSONAL</span><h2 id="profile-title">Build your interview brief</h2></div><span class="outline-icon" aria-hidden="true">↗</span></div>
@@ -110,7 +110,18 @@
               </section>
               <p id="draft-storage-status" class="draft-status" role="status">Unsent drafts are remembered in this tab.</p>
               <details id="draft-backup" class="card draft-backup" hidden><summary>Unsent draft from your previous question</summary><p id="draft-backup-text"></p></details>
-              <article id="readiness-card" class="card readiness-card" aria-labelledby="readiness-title" hidden><p class="eyebrow">A MOMENT TO REFLECT</p><h2 id="readiness-title" tabindex="-1">Your readiness report</h2><span id="readiness-label" class="readiness-label"></span><p id="readiness-summary" class="report-summary"></p><p class="field-help">This is your coach’s assessment from this practice session, not a hiring decision or a numerical score.</p><div class="report-footer"><button class="button primary" id="report-new-session" type="button">Practice for another role <span aria-hidden="true">→</span></button></div></article>
+              <article id="readiness-card" class="card readiness-card" aria-labelledby="readiness-title" hidden>
+                <p class="eyebrow">A MOMENT TO REFLECT</p><h2 id="readiness-title" tabindex="-1">Your readiness report</h2>
+                <span id="readiness-label" class="readiness-label"></span>
+                <h3 class="small-heading">Overall readiness assessment</h3><p id="readiness-summary" class="report-summary"></p>
+                <div class="report-sections">
+                  <section aria-labelledby="report-strengths-title"><h3 id="report-strengths-title" class="small-heading">Strengths</h3><div id="report-strengths"></div></section>
+                  <section aria-labelledby="report-improvements-title"><h3 id="report-improvements-title" class="small-heading">Areas to improve</h3><div id="report-improvements"></div></section>
+                  <section aria-labelledby="report-steps-title"><h3 id="report-steps-title" class="small-heading">Recommended next steps</h3><div id="report-steps"></div></section>
+                </div>
+                <p class="field-help">This is your coach’s assessment from this practice session, not a hiring decision or a numerical score.</p>
+                <div class="report-footer"><button class="button primary" id="report-new-session" type="button">Practice for another role <span aria-hidden="true">→</span></button></div>
+              </article>
               <section class="card feedback-card" aria-labelledby="feedback-title"><div class="card-heading"><div><span class="overline">WHAT YOUR COACH NOTICED</span><h2 id="feedback-title">Evidence &amp; feedback</h2></div><span class="outline-icon" aria-hidden="true">◎</span></div><div id="evaluation-list"></div><p id="evaluation-empty" class="empty-copy">No evaluation has been returned yet. Your coach may ask a follow-up before drawing a conclusion.</p></section>
               <section class="card history-card" aria-labelledby="history-title"><div class="card-heading"><div><span class="overline">YOUR CONVERSATION</span><h2 id="history-title">Practice journal</h2></div><span id="journal-count" class="input-caption">No saved answers yet</span></div><div id="history-list"></div><p id="history-empty" class="empty-copy">Your submitted questions and answers will appear here.</p></section>
             </div>

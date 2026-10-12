@@ -13,22 +13,31 @@ JobReady helps job seekers prepare for interviews using their CV, target job des
 - Evaluate candidate responses
 - Ask adaptive follow-up questions
 - Track interview progress
-- Produce a personalised readiness report
+- Finish within 10 accepted answers, or earlier when the agent has enough evidence
+- Produce a readiness report with an overall assessment, strengths, areas to improve, and next steps
+- Optional browser voice playback and editable answer dictation
 
 ## Technology
 
-- PHP 8.2
+- PHP 8.2+ (also compatible with PHP 8.3)
 - HTML, CSS and JavaScript
-- Gemini API (default), with optional OpenAI provider
+- Groq, Gemini (configuration default), or OpenAI, explicitly selected server-side
+- SQLite for saved interviews and fixed-window demo rate limits
 - neatlogs for agent observability
 
 ## Project status
 
-Hackathon development in progress.
+neatHack 2026 implementation: adaptive interviews, optional voice controls, shorter sessions, evidence-referenced reports, and offline regression coverage. Provider availability and browser speech support depend on the runtime; offline tests do not establish live-provider reliability.
+
+## Technical architecture
+
+`public/index.php` routes JSON requests through the shared judge gate, CSRF checks and rate limiter. `InterviewService` builds a candidate-specific plan, asks the selected AI client for an allowed action, validates it, and persists the result in SQLite. Actions are `ask_question`, `probe_answer`, `verify_claim`, and `finish_interview`; claim verification checks consistency against supplied evidence, not external facts. Answer persistence, the next decision and any final report share one transaction. neatlogs receives best-effort, privacy-allowlisted workflow spans after the operation.
+
+The frontend is dependency-free JavaScript; optional speech runs through browser APIs. There is no model training, permanent cross-session AI learning, or implemented "Practice this skill" feature. Each interview uses its supplied profile and saved history.
 
 ## Local setup
 
-Requirements: PHP 8.2 with `PDO`, `pdo_sqlite`, `curl`, `fileinfo`, `dom`, `zip`, `zlib`, and `iconv` enabled. Confirm the modules with `php -m`. Document extraction also requires an available PHP CLI executable and `proc_open`.
+Requirements: PHP 8.2+ with `PDO`, `pdo_sqlite`, `curl`, `fileinfo`, `dom`, `zip`, `zlib`, and `iconv` enabled. Confirm the modules with `php -m`. Document extraction also requires an available PHP CLI executable and `proc_open`.
 
 1. Copy `.env.example` to `.env` and adjust local settings as needed. The example contains placeholders only; credentials belong in `.env` and must not be committed. An empty `DEMO_ACCESS_CODE_HASH` preserves the local-only development workflow; the public demo must set it as described below.
 2. Install the locked, lightweight document-parser dependency:
@@ -59,9 +68,15 @@ Error messages distinguish recognized provider failures such as quota limits, un
 
 Controls support keyboard navigation, visible focus, labeled inputs, status announcements, and Ctrl/Cmd+Enter for answer submission. The layout adapts to desktop and mobile and respects reduced-motion preferences. The backend must be running on the same origin; do not open `app.html` directly as a local file. Loading the interface does not create an interview. Starting a session or submitting an answer makes real AI calls when credentials are configured.
 
+### Optional voice interview mode
+
+Voice Mode is off by default. Enable it explicitly to use Listen/Replay/Stop for question playback and Start/Stop dictation for answers. Dictated text stays editable and must be reviewed before an explicit submission; voice controls never automatically submit an answer. Recognition can resume after temporary silence, with bounded retries for recoverable recognition errors; stopping, disabling Voice Mode, navigation and completion cancel pending restarts. These are browser speech retries, not AI-request retries.
+
+Speech support, permission handling and transcript accuracy vary by browser/device; typing remains available. Use HTTPS on hosted sites. Browser recognition may send audio to its own external speech service. JobReady does not record or upload microphone audio, and voice recognition is not guaranteed to be continuous or accurate.
+
 ### Upload a CV document
 
-Choose or drop one **PDF or modern Word DOCX**, up to **5 MB (5,242,880 bytes)**, in the preparation screen. Paste-text input remains available. Extracted text fills the CV field for review/editing; it is not sent to Gemini until you explicitly start the interview. Failed extraction leaves existing pasted CV text unchanged. Scanned/image-only PDFs require OCR elsewhere or pasted text; this MVP does not run OCR. If extracted text exceeds the existing 20,000-byte interview CV limit, shorten it in the field before starting.
+Choose or drop one **PDF or modern Word DOCX**, up to **5 MB (5,242,880 bytes)**, in the preparation screen. Paste-text input remains available. Extracted text fills the CV field for review/editing; it is not sent to the selected AI provider until you explicitly start the interview. Failed extraction leaves existing pasted CV text unchanged. Scanned/image-only PDFs require OCR elsewhere or pasted text; this MVP does not run OCR. If extracted text exceeds the existing 20,000-byte interview CV limit, shorten it in the field before starting.
 
 `POST /api/cv/extract` accepts `multipart/form-data` with one `cv_file` and returns `{"text":"...", "format":"pdf"}` (or `docx`). Errors return a fixed `error` message and an allowlisted `code`. Extension, actual bytes/MIME, PHP upload errors, and actual size are checked. It uses bootstrap for demo authentication/rate limits and SQLite rate-limit counters, but does not call AI/neatlogs or create an interview.
 
@@ -81,7 +96,7 @@ GEMINI_API_KEY=replace-with-your-gemini-api-key
 GEMINI_MODEL=gemini-3.1-flash-lite
 ```
 
-Gemini is the default when `AI_PROVIDER` is absent. The client uses Google's [official REST generateContent API](https://ai.google.dev/api/generate-content), with the key in the `x-goog-api-key` header and JSON response mode. The default model is **Gemini 3.1 Flash-Lite (`gemini-3.1-flash-lite`)**, validated with JobReady's live interview workflow. Access, pricing, and any free-tier allowance depend on your account's quota, region, and current [model availability](https://ai.google.dev/gemini-api/docs/models) and [pricing](https://ai.google.dev/gemini-api/docs/pricing). Verify availability for your account before a live test; free-tier quota is not guaranteed. Set `GEMINI_MODEL` to another compatible JSON-capable Gemini text model if needed.
+Gemini is the default when `AI_PROVIDER` is absent. The client uses Google's [official REST generateContent API](https://ai.google.dev/api/generate-content), with the key in the `x-goog-api-key` header and JSON response mode. The default model is **Gemini 3.1 Flash-Lite (`gemini-3.1-flash-lite`)**. Access, pricing, and any free-tier allowance depend on your account's quota, region, and current [model availability](https://ai.google.dev/gemini-api/docs/models) and [pricing](https://ai.google.dev/gemini-api/docs/pricing). Verify availability for your account before a live test; free-tier quota is not guaranteed. Set `GEMINI_MODEL` to another compatible JSON-capable Gemini text model if needed.
 
 Use `AI_PROVIDER=openai` with `OPENAI_API_KEY` and `OPENAI_MODEL` to select the existing OpenAI client. Unsupported provider names fail configuration. Existing process environment variables take precedence over `.env`, so restart the PHP server after changing configuration and check for stale exported settings.
 
@@ -99,7 +114,7 @@ Do not place a real key in `.env.example`, source control, browser code, or chat
 
 For one fictional provider-only check, run `php scripts/test-groq.php --send` from the repository root after privately configuring `GROQ_API_KEY` (and optionally `GROQ_MODEL`). It calls `GroqClient::createPlan()` directly and validates the result without application bootstrap, interview creation, SQLite, neatlogs, or the JobReady interview-start rate limiter. It prints only a pass/fail message and makes one Groq API request. Running it without `--send` does not load `.env` or make a request.
 
-Gemini timeouts, quota/rate-limit errors, safety blocks, and malformed/truncated output fail safely. Failed interview turns roll back and leave the previous question available for retry; there are no automatic provider retries or fallbacks. The existing PHP action/tool validator still determines which decisions can execute. Merely loading bootstrap or the health endpoint makes no AI request; starting an interview or submitting an answer does.
+Provider timeouts, quota/rate-limit errors and malformed/truncated output fail safely. A decoded interview plan that fails strict validation gets **at most one bounded regeneration attempt**, before any interview is persisted. Valid plans use one call; transport, authentication, quota and JSON-parsing failures are not retried. Opening decisions and answer/report calls are not automatically retried, and there is no provider fallback. Groq plan generation is capped at 1,200 completion tokens; decision/report generation at 1,800. Failed answer turns roll back and leave the previous question available for an explicit retry after Refresh progress. The PHP action/tool validator determines which decisions can execute. Merely loading bootstrap or the health endpoint makes no AI request; starting an interview or submitting an answer does.
 
 ### Restricted hackathon judge access
 
@@ -113,11 +128,13 @@ Type a random judge code into standard input, then place only the resulting veri
 
 Required demo settings are `APP_ENV=production`, `APP_DEBUG=false`, `DEMO_ACCESS_CODE_HASH=<password_hash verifier>`, and (for a Cloudflare Quick Tunnel to a locally bound server) `APP_TRUSTED_PROXY_IPS=127.0.0.1,::1`. Keep the selected `AI_PROVIDER` and its matching private key/model configuration (`GEMINI_API_KEY`/`GEMINI_MODEL`, `OPENAI_API_KEY`/`OPENAI_MODEL`, or `GROQ_API_KEY`/`GROQ_MODEL`); `NEATLOGS_WRITE_KEY` and `NEATLOGS_PROJECT` enable optional best-effort tracing. `APP_DB_PATH` may be left at its existing default or set to a private persistent path. Never put the plaintext judge code in `.env`; only its verifier belongs there. If using a different proxy, trust only its verified immediate peer IP. The app honors `CF-Visitor`/`CF-Connecting-IP` only when `REMOTE_ADDR` exactly matches this allowlist. Bind PHP/cloudflared to loopback, not a public interface. `/api/dev/status` remains unavailable in production.
 
-Server-enforced SQLite-backed fixed-window limits are deliberately conservative for a small demo: **2 interview starts per client IP per hour and 10 globally per day; up to 20 answers per interview per hour, 20 answers per client IP per hour, and 40 globally per day; 3 document extractions per client IP per hour and 20 globally per day; 10 failed/correct login attempts per IP per hour and 100 globally per hour.** The per-interview answer cap matches the backend's maximum of 20 submitted answers; per-client and global limits still bound aggregate use. A turn can cause several provider calls, so also set a low provider-side quota/budget. Rate-limit identities are stored as HMAC buckets rather than plaintext IPs/session IDs. An unauthenticated upload can consume ingress bandwidth/temp space before PHP applies app-level limits; keep the server bound to loopback and configure the tunnel or host edge with a request-body limit near 6 MB and an additional request rate cap. Keep SQLite on one persistent host and stop the demo tunnel/server after judging.
+Server-enforced SQLite-backed fixed-window limits are deliberately conservative for a small demo: **2 interview starts per client IP per hour and 10 globally per day; up to 20 answer attempts per interview per hour, 20 per client IP per hour, and 40 globally per day; 3 document extractions per client IP per hour and 20 globally per day; 10 failed/correct login attempts per IP per hour and 100 globally per hour.** These security budgets remain unchanged; new interviews finish within 10 accepted answers, while the extra attempt budget supports explicit failure recovery and older interviews. A turn can cause several provider calls, so also set a low provider-side quota/budget. Rate-limit identities are stored as HMAC buckets rather than plaintext IPs/session IDs. An unauthenticated upload can consume ingress bandwidth/temp space before PHP applies app-level limits; keep the server bound to loopback and configure the tunnel or host edge with a request-body limit near 6 MB and an additional request rate cap. Keep SQLite on one persistent host and stop the demo tunnel/server after judging.
 
 Set `APP_TRUSTED_PROXY_IPS` only to the actual local connector addresses (the example loopback pair is for a tunnel to a server bound on loopback). If you do not use a reverse proxy, leave it empty; direct HTTPS is detected by PHP's `HTTPS` server variable. Do not trust arbitrary `X-Forwarded-*` values.
 
-The public preview is for **fictional candidate data only**. CV text and interview answers are stored in the SQLite database and sent to the selected AI provider when an interview starts or an answer is submitted. They are not encrypted by this application, and the MVP has no user accounts or deletion/retention workflow. Do not solicit real CVs or personal information. The document upload endpoint requires PHP's `proc_open` and CLI binary and is subject to the same authenticated session, CSRF protection, per-client/global limits, and 5 MB validation.
+For shared hosting, expose only the contents of `public/` through the document root. Keep `config/`, `src/`, `scripts/`, `vendor/`, `.env`, SQLite (including WAL/SHM sidecars), session files and logs private. Existing includes expect `config/` in the document root's parent; preserve that relationship if naming the public directory `public_html`. The repository's development server handles API routing, but Apache/LiteSpeed needs deployment-specific rules forwarding `/api/...` to `index.php` while serving assets normally and assigning a JavaScript MIME type to `.mjs`; no production `.htaccess` is supplied in this source release. The frontend uses root-relative API paths, so a subdirectory installation needs separate review. Verify direct HTTPS detection, private writable storage, outbound TLS, gateway timeouts, and web OPcache after publishing updated PHP files. An SSH subprocess test does not establish web-SAPI extraction support: the worker selects `PHP_BINDIR/php` under web PHP and requires that executable and its parser extensions to be available.
+
+The public preview is for **fictional candidate data only**. CV text and interview answers are stored in the SQLite database and sent to the selected AI provider when an interview starts or an answer is submitted. They are not encrypted by this application, and the MVP has no user accounts or deletion/retention workflow. The shared judge gate is not per-candidate ownership authorization: an authenticated holder of an interview ID can retrieve that interview, so keep IDs private. Do not solicit real CVs or personal information. The document upload endpoint requires PHP's `proc_open` and CLI binary and is subject to the same authenticated session, CSRF protection, per-client/global limits, and 5 MB validation.
 
 #### Safe development diagnostics
 
@@ -142,12 +159,25 @@ neatlogs uses the documented [`POST /v1/trace` HTTP ingest contract](https://doc
 - `POST /api/interviews/{id}/answers` — submit a response. JSON body: `{"answer":"..."}`. The agent evaluates context and chooses its next action; it may ask a new question, probe the answer, verify a claim against supplied evidence, or finish.
 - `GET /api/interviews/{id}` — retrieve progress, questions, answers, decisions, evaluations, and any current question. CV and job-description fields are not returned.
 
-Requests must use `Content-Type: application/json`. CV text is limited to 20 KB, job descriptions to 16 KB, role names to 200 bytes, answers to 8 KB, and interviews to 20 submitted answers. Agent decisions are bounded to three per API turn.
+Requests must use `Content-Type: application/json`. CV text is limited to 20 KB, job descriptions to 16 KB, role names to 200 bytes, answers to 8 KB, and new interviews to **10 submitted answers**. The agent can finish earlier; once the tenth answer is accepted, only `finish_interview` is permitted, never question 11. Agent decisions are bounded to three per API turn.
+
+### Concise, evidence-backed readiness reports
+
+Reports retain `summary` and the `not_ready` / `developing` / `ready` practice classification, adding `strengths`, `areas_to_improve`, and `next_steps`. The interface shows **Overall readiness assessment**, **Strengths**, **Areas to improve**, and **Recommended next steps**. Each finding contains `text`, `answer_no`, and a verbatim `evidence` excerpt; improvement findings also cite a verbatim job `requirement`.
+
+The latest completion fix keeps the core action, rationale, summary and readiness classification strict, but validates optional findings independently. It retains at most three supported findings per section and discards malformed items, unresolved answer references, paraphrased evidence and non-exact job requirements instead of blocking an otherwise valid report. Only canonical numeric-string references to existing answers are normalized. Empty sections display honest insufficient-evidence/not-provided messages. Valid recommendations are retained, with safe general preparation actions supplying missing steps so new reports have 2–3 actions. No candidate achievements or evidence are fabricated by these fallbacks. Validation/log work is bounded, and private diagnostics contain fixed core-failure or optional-discard labels only. Exact reference checks cannot prove every model interpretation correct. This is practice feedback, not a hiring decision.
+
+Existing summary-only reports render unchanged with explicit missing-section messages. No database migration is needed, and existing interview API paths/input fields remain unchanged. An older active interview at or above 10 saved answers can submit its already-issued question once, then must finish; no saved answers are removed. The final report receives all saved answer evidence. Provider failures or genuinely invalid core reports roll back the entire turn, preserving the current question; the browser retains its draft and requires **Refresh progress** before an explicit retry. A valid final answer and report commit atomically. Completion still requires a valid core assessment; there is no automatic answer/report retry or fabricated fallback assessment.
+
+Security counters remain independent: 20 answer attempts per interview/client per hour and 40 globally per day. Failed attempts still consume those limits. They are not shortened to match the new 10-answer interview cap.
 
 Run all offline tests:
 
 ```sh
 php tests/InterviewWorkflowTest.php
+php tests/ShorterInterviewReportTest.php
+php tests/PlanValidationRecoveryTest.php
+php tests/ReportCompletionValidationTest.php
 php tests/DemoAccessTest.php
 php tests/DemoAccessHttpTest.php
 php tests/GeminiClientTest.php
@@ -160,10 +190,13 @@ php tests/InterviewConnectivityTest.php
 php tests/FrontendHttpTest.php
 php tests/DocumentExtractionTest.php
 php tests/CvUploadHttpTest.php
-node --test tests/FrontendTest.mjs tests/CvUploadFrontendTest.mjs
+php tests/DemoDeploymentSecurityTest.php
+php tests/GroqClientTest.php
+php tests/InterviewAnswerRateLimitTest.php
+node --test tests/FrontendTest.mjs tests/CvUploadFrontendTest.mjs tests/VoiceInterviewTest.mjs
 ```
 
-These use fake model/HTTP responses and SQLite in-memory databases. They do not load private `.env` or make Gemini, OpenAI, or neatlogs requests. The Gemini tests cover response parsing, request shape, invalid responses/actions, adaptive workflow compatibility, quota/timeouts, and transactional recovery.
+These use fake model/HTTP responses and in-memory/disposable SQLite databases. They do not load private `.env` or make Groq, Gemini, OpenAI, or neatlogs requests. The suites cover provider request shape/parsing, bounded plan recovery, early/10-answer/legacy completion, final-answer persistence, invalid-core rollback, filtering optional report findings, privacy-safe diagnostics, authentication/CSRF, rate limits and tracing. Tests simulate runtime behavior; they do not prove live provider availability.
 
 The frontend JavaScript tests use Node.js 20+ built-in testing tools (development only, no packages). They verify the PHP response contract, UTF-8 input limits, exact API paths, request timeouts, no automatic retries, allowlisted error diagnostics, production fallback messages, text-only rendering, follow-up display, tab-scoped draft persistence, page-reload recovery, submission guards, and completion reports with fake DOM/fetch fixtures. The frontend HTTP test checks HTML/assets/module MIME types on an isolated PHP server and verifies the health endpoint remains unchanged.
 

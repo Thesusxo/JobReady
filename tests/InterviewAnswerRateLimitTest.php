@@ -75,7 +75,7 @@ for ($answer = 1; $answer <= DecisionValidator::MAX_ANSWERS; $answer++) {
     $result = $workflow->submitAnswer($started['id'], 'Fictional answer number ' . $answer . '.');
 }
 answerLimitCheck($result['status'] === 'finished' && $result['answer_count'] === DecisionValidator::MAX_ANSWERS,
-    'The full legitimate 20-answer interview did not finish.');
+    'The full legitimate 10-answer interview did not finish.');
 answerLimitCheck(count($result['evaluations']) === 1 && $result['evaluations'][0]['evaluation_type'] === 'readiness_report',
     'The maximum-length interview did not persist its readiness report.');
 
@@ -83,7 +83,7 @@ answerLimitCheck(count($result['evaluations']) === 1 && $result['evaluations'][0
 $sessionPdo = rateLimitDatabase();
 $sessionAccess = new DemoAccess($sessionPdo, 'production', password_hash('fictional-session-limit-key', PASSWORD_DEFAULT), '');
 $sessionId = answerSessionId(1);
-for ($i = 1; $i <= DecisionValidator::MAX_ANSWERS; $i++) {
+for ($i = 1; $i <= 20; $i++) {
     $_SERVER['REMOTE_ADDR'] = '198.51.100.' . $i;
     $sessionAccess->enforceEndpointLimit('/api/interviews/' . $sessionId . '/answers', 'POST', $sessionId);
 }
@@ -122,4 +122,4 @@ expectAnswerRateLimit(
     'The existing global 40-answer daily cap changed.',
 );
 
-echo "Interview answer rate-limit tests passed (20-answer completion, per-interview/per-client caps, unchanged global cap; in-memory fixtures).\n";
+echo "Interview answer rate-limit tests passed (10-answer completion, unchanged 20-turn security caps and global cap; in-memory fixtures).\n";

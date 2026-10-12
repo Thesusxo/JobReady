@@ -103,7 +103,10 @@ namespace {
     $payload = json_decode($options[CURLOPT_POSTFIELDS], true, 32, JSON_THROW_ON_ERROR);
     groqTestCheck($payload['model'] === 'openai/gpt-oss-20b', 'Groq model was not sent.');
     groqTestCheck(($payload['response_format'] ?? null) === ['type' => 'json_object'], 'JSON-object mode is missing.');
-    groqTestCheck(($payload['max_completion_tokens'] ?? null) === 700 && !isset($payload['max_tokens']), 'Groq completion-token parameter is incompatible.');
+    groqTestCheck(($payload['max_completion_tokens'] ?? null) === 1200 && !isset($payload['max_tokens']), 'Groq plan token budget is incompatible.');
+    groqTestCheck(str_contains($payload['messages'][0]['content'], '120 UTF-8 bytes')
+        && str_contains($payload['messages'][0]['content'], '600 UTF-8 bytes')
+        && str_contains($payload['messages'][0]['content'], 'No wrapper object'), 'Exact plan validation constraints missing from prompt.');
     groqTestCheck(($payload['temperature'] ?? null) === 0.5 && ($payload['reasoning_effort'] ?? null) === 'low'
         && ($payload['include_reasoning'] ?? null) === false, 'Groq reasoning settings are not bounded.');
     groqTestCheck(!str_contains($options[CURLOPT_POSTFIELDS], $fakeKey), 'Groq key leaked into the request body.');
@@ -112,7 +115,8 @@ namespace {
     OpenAICompatibleCurlFixture::reset(openAICompletion($decision));
     groqTestCheck($client->decide(['allowed_actions' => ['ask_question']]) === $decision, 'Groq decision JSON was not parsed.');
     $payload = json_decode(OpenAICompatibleCurlFixture::$options[CURLOPT_POSTFIELDS], true, 32, JSON_THROW_ON_ERROR);
-    groqTestCheck(($payload['max_completion_tokens'] ?? null) === 800, 'Groq decision token budget changed.');
+    groqTestCheck(($payload['max_completion_tokens'] ?? null) === 1800, 'Groq report token budget is not bounded.');
+    groqTestCheck(str_contains($payload['messages'][0]['content'], 'strengths') && str_contains($payload['messages'][0]['content'], 'verbatim'), 'Evidence-backed report instructions missing.');
 
     OpenAICompatibleCurlFixture::reset(openAICompletion($evaluation));
     groqTestCheck($client->verifyClaim(['answer' => 'Fictional answer.'], 'fictional claim') === $evaluation, 'Groq evaluation JSON was not parsed.');
@@ -147,6 +151,24 @@ namespace {
     $openAIPayload = json_decode(OpenAICompatibleCurlFixture::$options[CURLOPT_POSTFIELDS], true, 32, JSON_THROW_ON_ERROR);
     groqTestCheck(($openAIPayload['model'] ?? null) === 'gpt-4o-mini' && ($openAIPayload['max_tokens'] ?? null) === 700
         && !isset($openAIPayload['max_completion_tokens'], $openAIPayload['reasoning_effort']), 'OpenAI request parameters changed.');
+
+    // The Groq adapter can decode a response successfully while the plan guardrail rejects it.
+    foreach ([
+        [array_replace($plan, ['suggested_depth' => 'Intermediate']), 'PLAN_DEPTH_ENUM'],
+        [array_replace($plan, ['focus_areas' => [['topic' => 'Testing'], ['topic' => 'APIs']]]), 'PLAN_FOCUS_ITEM_TYPE'],
+        [array_replace($plan, ['rationale' => str_repeat('x', 601)]), 'PLAN_RATIONALE_LENGTH'],
+    ] as [$invalidPlan, $reason]) {
+        OpenAICompatibleCurlFixture::reset(openAICompletion($invalidPlan));
+        $decodedPlan = $client->createPlan($candidate);
+        groqTestCheck($decodedPlan === $invalidPlan, 'Decodable malformed plan was not reproduced through Groq adapter.');
+        try {
+            (new JobReady\Interview\DecisionValidator())->validatePlan($decodedPlan);
+            throw new RuntimeException('Malformed Groq plan passed the guardrail.');
+        } catch (JobReady\Http\HttpException $e) {
+            groqTestCheck($e->status === 502 && ($e->diagnostics['reason'] ?? null) === $reason, 'Groq guardrail reason lost.');
+        }
+        groqTestCheck(OpenAICompatibleCurlFixture::$requests === 1, 'Transport itself retried a decodable plan.');
+    }
 
     echo "Groq/OpenAI-compatible adapter tests passed (endpoint, model, JSON, bounded TLS transport, error redaction; offline only).\n";
 }

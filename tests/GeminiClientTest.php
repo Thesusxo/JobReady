@@ -79,7 +79,7 @@ $transport = static function (string $url, array $payload) use (&$mode, &$calls,
     $calls++;
     geminiCheck($url === 'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent', 'Incorrect REST model endpoint.');
     geminiCheck(($payload['generationConfig']['responseMimeType'] ?? '') === 'application/json', 'JSON mode is missing.');
-    geminiCheck(($payload['generationConfig']['maxOutputTokens'] ?? 0) <= 800, 'Output is not bounded.');
+    geminiCheck(($payload['generationConfig']['maxOutputTokens'] ?? 0) <= 1800, 'Output is not bounded.');
     geminiCheck(isset($payload['systemInstruction']['parts'][0]['text']), 'System instructions are missing.');
     geminiCheck(($payload['contents'][0]['role'] ?? '') === 'user', 'Candidate input is not separate from instructions.');
     $context = json_decode($payload['contents'][0]['parts'][0]['text'], true, 32, JSON_THROW_ON_ERROR);

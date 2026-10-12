@@ -106,7 +106,12 @@ export function readinessReport(session) {
   const finish = [...session.decisions].reverse().find(decision => decision.action === 'finish_interview');
   const data = report?.data ?? finish?.result;
   if (!record(data)) return null;
-  return { summary: text(data.summary), readiness: ['not_ready', 'developing', 'ready'].includes(data.readiness) ? data.readiness : null };
+  const findings = value => Array.isArray(value) ? value.filter(record).filter(item => text(item.text)).slice(0, 3)
+    .map(item => ({ text: text(item.text), answer_no: Number.isInteger(item.answer_no) ? item.answer_no : null,
+      evidence: text(item.evidence), requirement: text(item.requirement) })) : [];
+  return { summary: text(data.summary), readiness: ['not_ready', 'developing', 'ready'].includes(data.readiness) ? data.readiness : null,
+    strengths: findings(data.strengths), areas_to_improve: findings(data.areas_to_improve),
+    next_steps: Array.isArray(data.next_steps) ? data.next_steps.filter(item => typeof item === 'string' && item.trim()).slice(0, 3) : [] };
 }
 
 export function sessionAdvanced(before, after) {

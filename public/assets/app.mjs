@@ -273,6 +273,9 @@ function renderSession(focusQuestion = false) {
     $('readiness-label').textContent = report?.readiness ? labels[report.readiness] : '';
     $('readiness-label').className = `readiness-label ${report?.readiness ?? ''}`;
     $('readiness-summary').textContent = report?.summary || 'The interview is complete, but no readiness summary was returned.';
+    renderReportSection('report-strengths', report?.strengths ?? [], 'No supported strengths were provided in this report. The available evidence may be insufficient.');
+    renderReportSection('report-improvements', report?.areas_to_improve ?? [], 'No specific areas to improve were provided in this report. This does not imply there are no gaps.');
+    renderReportSection('report-steps', report?.next_steps ?? [], 'No recommended next steps were provided in this report.');
   } else {
     const probing = decision?.action === 'probe_answer';
     $('question-kind').textContent = probing ? 'Follow-up' : 'New question';
@@ -354,6 +357,26 @@ $('answer-form').addEventListener('submit', async event => {
     if (error instanceof ApiError && error.status === 401 && accessRequired) showAccessGate();
   } finally { submittingAnswer = false; setBusy(false); }
 });
+
+function renderReportSection(id, items, emptyMessage) {
+  const container = $(id);
+  container.replaceChildren();
+  if (!items.length) {
+    container.append(element('p', 'empty-copy', emptyMessage));
+    return;
+  }
+  const list = element(id === 'report-steps' ? 'ol' : 'ul', 'report-list');
+  for (const item of items) {
+    const entry = element('li', '');
+    entry.append(element('p', '', typeof item === 'string' ? item : item.text));
+    if (typeof item !== 'string' && item.evidence) {
+      entry.append(element('p', 'field-help', `Answer ${item.answer_no}: “${item.evidence}”`));
+      if (item.requirement) entry.append(element('p', 'field-help', `Job requirement: ${item.requirement}`));
+    }
+    list.append(entry);
+  }
+  container.append(list);
+}
 
 async function loadSession(id, restoring = false) {
   if (busy) return;

@@ -514,3 +514,8 @@ kbd { margin: 0 2px; padding: 2px 4px; color: #384957; background: var(--seconda
   main { max-width: none; padding: 0; }
   .card { margin-bottom: 20px; box-shadow: none; break-inside: avoid; }
 }
+.report-sections { display: grid; gap: 1.25rem; margin: 1.5rem 0; }
+.report-sections section { border-top: 1px solid var(--line); padding-top: 1rem; min-width: 0; }
+.report-list { padding-left: 1.25rem; margin: .75rem 0 0; overflow-wrap: anywhere; }
+.report-list li + li { margin-top: .8rem; }
+.report-list p { margin: .35rem 0; }

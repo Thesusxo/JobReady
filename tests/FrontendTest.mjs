@@ -90,6 +90,27 @@ test('API adapter uses only the three existing endpoints, validates UTF-8 byte l
   await assert.rejects(malformed.progress(id), error => error.kind === 'response' && !error.message.includes('PRIVATE_SENTINEL'));
 });
 
+test('structured report adapter preserves evidence and handles legacy/missing fields without inventing findings', () => {
+  const data = finished();
+  const legacy = readinessReport(parseSession(data));
+  assert.deepEqual(legacy.strengths, []);
+  assert.deepEqual(legacy.areas_to_improve, []);
+  assert.deepEqual(legacy.next_steps, []);
+  data.evaluations.at(-1).data = { summary: 'Developing.', readiness: 'developing',
+    strengths: [{ text: unsafeText, answer_no: 2, evidence: 'I used PHP logs' }],
+    areas_to_improve: [{ text: 'Explain impact.', answer_no: 1, evidence: 'I checked some code.', requirement: 'debugging' }],
+    next_steps: ['Practice a measured example.', 'Explain a regression test.'] };
+  const report = readinessReport(parseSession(data));
+  assert.equal(report.strengths[0].text, unsafeText);
+  assert.equal(report.areas_to_improve[0].requirement, 'debugging');
+  assert.equal(report.next_steps.length, 2);
+  data.evaluations.at(-1).data = { summary: 'Limited evidence.', strengths: null, areas_to_improve: 'invalid', next_steps: [null, 5] };
+  const incomplete = readinessReport(parseSession(data));
+  assert.deepEqual(incomplete.strengths, []);
+  assert.deepEqual(incomplete.next_steps, []);
+  assert.equal(incomplete.readiness, null);
+});
+
 test('timeouts and connection errors preserve safe failure categories without retries', async () => {
   let calls = 0;
   const timeout = createInterviewApi((path, options) => {
@@ -392,6 +413,9 @@ test('preparation, follow-up, refresh recovery, and completion UI work with a fa
   assert.equal(nodes.get('readiness-label').textContent, 'Developing');
   assert.ok(nodes.get('readiness-summary').textContent.includes(unsafeText));
   assert.equal(nodes.get('readiness-summary').childElementCount, 0);
+  assert.match(nodes.get('report-strengths').textContent, /No supported strengths were provided/);
+  assert.match(nodes.get('report-improvements').textContent, /does not imply there are no gaps/);
+  assert.match(nodes.get('report-steps').textContent, /No recommended next steps/);
   assert.equal(nodes.get('answer-text').value, '', 'An already-saved answer must not be re-submitted.');
   assert.equal(nodes.get('draft-backup').hidden, false, 'An edited unsent draft must remain available after a changed question.');
   assert.equal(nodes.get('draft-backup-text').textContent, editedDraft);
@@ -401,4 +425,40 @@ test('preparation, follow-up, refresh recovery, and completion UI work with a fa
   assert.equal(queue.length, 0);
   assert.ok(!nodes.get('error-message').textContent.includes('PRIVATE_SENTINEL'));
   assert.equal(stored.get('jobready.session-id'), id, 'Recovery must preserve the original session.');
+  const structured = finished();
+  structured.evaluations.at(-1).data = { summary: 'Developing.', readiness: 'developing',
+    strengths: [{ text: unsafeText, answer_no: 2, evidence: 'I used PHP logs' }],
+    areas_to_improve: [{ text: 'Explain measurement.', answer_no: 1, evidence: 'I checked some code.', requirement: 'debugging' }],
+    next_steps: ['Practice a measured example.', 'Explain a regression test.'] };
+  queue.push(response(structured));
+  nodes.get('refresh-button').listeners.get('click')();
+  await new Promise(resolve => setTimeout(resolve, 0));
+  assert.ok(nodes.get('report-strengths').textContent.includes(unsafeText));
+  assert.match(nodes.get('report-strengths').textContent, /Answer 2/);
+  assert.match(nodes.get('report-improvements').textContent, /Job requirement: debugging/);
+  assert.equal(nodes.get('report-steps').children[0].tag, 'ol');
+  assert.equal(nodes.get('report-steps').children[0].children.length, 2);
+  assert.equal(nodes.get('report-strengths').children[0].children[0].children[0].childElementCount, 0, 'Report findings must be text-only.');
+  assert.equal(nodes.get('voice-controls').hidden, true, 'Completion must stop voice mode.');
+  const filteredReport = finished();
+  filteredReport.evaluations.at(-1).data = { summary: 'Developing: the available evidence is limited.', readiness: 'developing',
+    strengths: [], areas_to_improve: [], next_steps: [
+      'Review your saved answers against the job requirements and identify evidence to add.',
+      'Practice one concrete example explaining your contribution, reasoning, and outcome.',
+    ] };
+  queue.push(response(filteredReport));
+  const beforeRefresh = requests.length;
+  nodes.get('refresh-button').listeners.get('click')();
+  await new Promise(resolve => setTimeout(resolve, 0));
+  assert.equal(requests.length, beforeRefresh + 1);
+  assert.equal(requests.at(-1)[1], 'GET', 'Checking a filtered report must never start/resubmit an interview.');
+  assert.equal(nodes.get('readiness-card').hidden, false);
+  assert.equal(nodes.get('readiness-summary').textContent, filteredReport.evaluations.at(-1).data.summary);
+  assert.match(nodes.get('report-strengths').textContent, /No supported strengths were provided/);
+  assert.match(nodes.get('report-improvements').textContent, /does not imply there are no gaps/);
+  assert.equal(nodes.get('report-steps').children[0].children.length, 2);
+  assert.equal(nodes.get('voice-controls').hidden, true);
+  assert.equal(nodes.get('answer-card').hidden, true);
+  assert.equal(nodes.get('submit-answer').disabled, true);
+  assert.equal(queue.length, 0);
 });
