@@ -1,29 +1,53 @@
 ﻿# JobReady
 
-An AI-powered adaptive interview preparation agent built for neatHack 2026.
+**Role-specific interview practice, with feedback you can act on.** Built for neatHack 2026.
 
-## What it does
+[Live app](https://linen-sheep-482745.hostingersite.com/app.html) · [GitHub source](https://github.com/Thesusxo/JobReady) · [Earlier Entire development session](https://entire.io/gh/Thesusxo/JobReady/session/ses_edb48bbe4ffexxjnaXrcx5wIhd)
 
-JobReady helps job seekers prepare for interviews using their CV, target job description, and personalised practice sessions.
+## The problem
 
-## Core features
+Generic question lists can miss the experience and skills a particular role requires. Candidates need focused practice and a clear view of the evidence they demonstrated—and the areas that still need work.
 
-- Analyse a candidate's CV and job description
-- Generate relevant interview questions
-- Evaluate candidate responses
-- Ask adaptive follow-up questions
-- Track interview progress
-- Finish within 10 accepted answers, or earlier when the agent has enough evidence
-- Produce a readiness report with an overall assessment, strengths, areas to improve, and next steps
-- Optional browser voice playback and editable answer dictation
+## What JobReady does
+
+JobReady uses a CV, target role, and job description to create an adaptive practice interview. It chooses relevant questions and follow-ups from the candidate's answers, then produces a concise readiness report grounded in supplied evidence. The report is practice feedback, not a hiring decision.
+
+### Key features
+
+- **Adaptive questions:** role-specific planning, follow-ups, and internal claim-evidence reviews.
+- **Shorter practice:** new interviews accept at most 10 answers and can finish earlier.
+- **Four-part report:** overall readiness, strengths, areas to improve, and actionable next steps. Unverifiable optional findings are omitted honestly.
+- **Optional voice:** question playback and editable dictation, with typing always available.
+- **Saved progress:** answer journal, tab-scoped draft recovery, and explicit Refresh progress before resubmitting a failed turn.
+
+### Try the demo
+
+Open the [live app](https://linen-sheep-482745.hostingersite.com/app.html). The preview requires a judge access code shared privately by the team; no code is published here. Use fictional candidate details only. Starting an interview or submitting an answer makes a real provider request. Quotas, hosting timeouts, invalid core model output, and browser speech support can still affect the experience; live completion is not guaranteed.
+
+### How an interview works
+
+1. **Prepare:** review pasted or PDF/DOCX-extracted CV text, the job requirements, and target role.
+2. **Practice:** the agent creates a plan, asks a question, and adapts its next action to each submitted answer.
+3. **Finish:** early completion is allowed; at answer 10, only a finish decision is permitted. The accepted final answer and report are saved together.
+4. **Reflect:** review the four report sections, evidence references, and practical next steps. If a submission fails, check saved progress before an explicit retry.
 
 ## Technology
 
-- PHP 8.2+ (also compatible with PHP 8.3)
-- HTML, CSS and JavaScript
-- Groq, Gemini (configuration default), or OpenAI, explicitly selected server-side
-- SQLite for saved interviews and fixed-window demo rate limits
-- neatlogs for agent observability
+PHP 8.2+ / PHP 8.3 · HTML/CSS/vanilla JavaScript · SQLite · Groq (`openai/gpt-oss-20b`), Gemini or OpenAI · browser speech APIs · optional neatlogs tracing. Gemini remains the configuration default; providers are explicitly selected server-side.
+
+## Hackathon tools and evidence
+
+| Tool | Actual role in JobReady |
+| --- | --- |
+| **neatlogs** | Runtime observability for interview-start and answer-turn workflows, model calls, agent decisions, validation guardrails, and persistence/rollback tasks. Traces use privacy-allowlisted metadata rather than candidate content. |
+| **Entire** | Captured an earlier development session, linked above as development evidence. The final source release's normal checkpoint hook timed out; **no Entire checkpoint was confirmed for that release**. The session link is not proof of a final-release checkpoint. |
+| **cfo.ai** | Financial planning and scenario modeling for exploring costs, pricing, and hypothetical business cases. Planning scenarios are assumptions, not evidence of paying customers, validated revenue, or commercial traction; cfo.ai is not part of the runtime interview engine. |
+
+### What observability showed
+
+During testing, a live `jobready.interview.started` trace identified a failure at `validate_interview_plan` with `invalid_output`. This localized the problem to the plan guardrail; it did not identify the exact rejected field or prove token truncation. The source now includes clearer plan instructions, fixed-label diagnostics, and one bounded regeneration attempt for decoded invalid plans.
+
+A separate final-answer HTTP 502 exposed how strict optional report findings could block completion. Offline regressions reproduce evidence/reference/format failures and verify that valid core reports now complete while unverifiable optional findings are discarded. Instrumented answer turns distinguish `validate_agent_decision`, successful persistence, and transaction rollback. These traces and tests explain execution and recovery; they do not establish that every production failure is fixed. Private trace dashboards and candidate records are not published as evidence.
 
 ## Project status
 
